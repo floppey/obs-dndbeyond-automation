@@ -2,6 +2,8 @@
  * Type definitions for OBS D&D Beyond HP Swapper
  */
 
+import { StatMapping } from "./stats/types.js";
+
 /**
  * HP health states mapped from percentage
  */
@@ -31,7 +33,30 @@ export interface Modifier {
   type: string;
   subType: string;
   value: number | null;
+  isGranted?: boolean;
+  restriction?: string;
+  dice?: {
+    diceCount: number | null;
+    diceValue: number | null;
+    diceMultiplier: number | null;
+    fixedValue: number | null;
+    diceString: string | null;
+  } | null;
   [key: string]: unknown; // Allow additional fields
+}
+
+/**
+ * Character value override from D&D Beyond API
+ * Stores custom character overrides like AC bonuses and speed bonuses
+ */
+export interface CharacterValue {
+  typeId: number;
+  value: number | string;
+  notes: string | null;
+  valueId: string | null;
+  valueTypeId: string | null;
+  contextId: string | null;
+  contextTypeId: string | null;
 }
 
 /**
@@ -40,6 +65,26 @@ export interface Modifier {
 export interface ClassEntry {
   level: number;
   [key: string]: unknown; // Allow additional fields
+}
+
+/**
+ * Inventory item from D&D Beyond API
+ */
+export interface InventoryItem {
+  id: number;
+  entityTypeId: number;
+  definition: {
+    id: number;
+    name: string;
+    isConsumable: boolean;
+    canEquip: boolean;
+    canAttune: boolean;
+    [key: string]: unknown;
+  };
+  quantity: number;
+  isAttuned: boolean;
+  equipped: boolean;
+  [key: string]: unknown;
 }
 
 /**
@@ -68,6 +113,8 @@ export interface DndBeyondCharacterResponse {
     failures: number;
   };
   isDead: boolean;
+  characterValues?: CharacterValue[];
+  inventory?: InventoryItem[];
   [key: string]: unknown; // Allow additional fields
 }
 
@@ -109,6 +156,10 @@ export interface Config {
   };
   obs: OBSClientConfig;
   pollIntervalMs: number;
+  statMappings: StatMapping[];
+  debug: {
+    saveApiResponse: boolean;
+  };
 }
 
 /**
@@ -132,3 +183,4 @@ export interface IOBSClient {
     visible: boolean
   ): Promise<void>;
 }
+

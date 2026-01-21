@@ -7,7 +7,9 @@ import { loadConfig, logConfig } from "./config.js";
 import { DndBeyondClient } from "./dnd-beyond/client.js";
 import { formatHpInfo } from "./dnd-beyond/hp-calculator.js";
 import { OBSClient } from "./obs/client.js";
-import { HpState } from "./types.js";
+import { StatCalculator } from "./stats/index.js";
+import { HpState, Config } from "./types.js";
+import { CalculatedStat } from "./stats/types.js";
 
 /**
  * Main application class
@@ -15,27 +17,33 @@ import { HpState } from "./types.js";
 class OBSDndBeyondAutomation {
   private dndClient: DndBeyondClient;
   private obsClient: OBSClient;
+  private statCalculator: StatCalculator;
+  private config: Config;
   private pollIntervalMs: number;
   private pollHandle: NodeJS.Timeout | null = null;
   private previousState: HpState | null = null;
+  private previousStatValues: Map<string, string> = new Map();
   private isShuttingDown = false;
   private pollCount = 0;
 
-  constructor() {
-    const config = loadConfig();
-    logConfig(config);
+   constructor() {
+     const config = loadConfig();
+     logConfig(config);
 
-    this.dndClient = new DndBeyondClient(
-      config.dnd.characterId,
-      config.dnd.cobaltSession
-    );
-    this.obsClient = new OBSClient(config.obs);
-    this.pollIntervalMs = config.pollIntervalMs;
+     this.config = config;
+     this.dndClient = new DndBeyondClient(
+       config.dnd.characterId,
+       config.dnd.cobaltSession,
+       config.debug.saveApiResponse
+     );
+     this.obsClient = new OBSClient(config.obs);
+     this.statCalculator = new StatCalculator();
+     this.pollIntervalMs = config.pollIntervalMs;
 
-    // Set up graceful shutdown handlers
-    process.on("SIGINT", () => this.shutdown("SIGINT"));
-    process.on("SIGTERM", () => this.shutdown("SIGTERM"));
-  }
+     // Set up graceful shutdown handlers
+     process.on("SIGINT", () => this.shutdown("SIGINT"));
+     process.on("SIGTERM", () => this.shutdown("SIGTERM"));
+   }
 
   /**
    * Start the automation
@@ -71,53 +79,103 @@ class OBSDndBeyondAutomation {
     }
   }
 
-   /**
-    * Execute one polling cycle
-    */
-   private async poll(): Promise<void> {
-     this.pollCount++;
+    /**
+     * Execute one polling cycle
+     */
+    private async poll(): Promise<void> {
+      this.pollCount++;
 
-     // Skip if shutting down
-     if (this.isShuttingDown) {
-       return;
-     }
+      // Skip if shutting down
+      if (this.isShuttingDown) {
+        return;
+      }
 
-     try {
-       // Fetch current character state
-       const characterData = await this.dndClient.fetchCharacter();
-       const hpInfo = formatHpInfo(
-         characterData.currentHp,
-         characterData.maxHp,
-         characterData.temporaryHp,
-         characterData.state
-       );
+      try {
+        // Fetch current character state
+        const characterData = await this.dndClient.fetchCharacter();
+        const hpInfo = formatHpInfo(
+          characterData.currentHp,
+          characterData.maxHp,
+          characterData.temporaryHp,
+          characterData.state
+        );
 
-       // Check if state changed
-       if (characterData.state === this.previousState) {
-         console.log(`[POLL #${this.pollCount}] ${hpInfo} [no change]`);
-         return;
-       }
+        // Check if HP state changed
+        const hpStateChanged = characterData.state !== this.previousState;
 
-       // State changed - update OBS
-       console.log(`[POLL #${this.pollCount}] ${hpInfo}`);
-       this.previousState = characterData.state;
+        // Calculate stats and check if any changed
+        let statsCalculated: CalculatedStat[] = [];
+        if (this.config.statMappings.length > 0) {
+          try {
+            const rawCharacterData = await this.dndClient.fetchRawCharacter();
+            statsCalculated = this.statCalculator.calculateMappings(
+              this.config.statMappings,
+              rawCharacterData,
+              this.previousStatValues
+            );
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            console.warn(`[POLL #${this.pollCount}] Failed to calculate stats: ${errorMessage}`);
+          }
+        }
 
-       // Update OBS based on configuration mode
-       try {
-         await this.updateOBS(characterData.state);
-       } catch (error) {
-         console.error(
-           `[APP] Failed to update OBS: ${
-             error instanceof Error ? error.message : String(error)
-           }`
-         );
-       }
-     } catch (error) {
-       const errorMessage = error instanceof Error ? error.message : String(error);
-       console.error(`[POLL #${this.pollCount}] Error fetching character: ${errorMessage}`);
-       throw error; // Re-throw to trigger fail-fast in interval handler
-     }
-   }
+        // Check if any stats changed
+        const anyStatsChanged = statsCalculated.some((s) => s.changed);
+
+        // Log state
+        if (!hpStateChanged && !anyStatsChanged) {
+          console.log(`[POLL #${this.pollCount}] ${hpInfo} [no changes]`);
+          return;
+        }
+
+        // Log changes
+        console.log(`[POLL #${this.pollCount}] ${hpInfo}`);
+        if (anyStatsChanged) {
+          const changedStats = statsCalculated.filter((s) => s.changed);
+          for (const stat of changedStats) {
+            console.log(
+              `[POLL #${this.pollCount}]   ${stat.obsSourceName}: ${stat.value}`
+            );
+          }
+        }
+
+        // Update OBS for HP state if changed
+        if (hpStateChanged) {
+          this.previousState = characterData.state;
+          try {
+            await this.updateOBS(characterData.state);
+          } catch (error) {
+            console.error(
+              `[APP] Failed to update OBS HP state: ${
+                error instanceof Error ? error.message : String(error)
+              }`
+            );
+          }
+        }
+
+        // Update OBS for changed stats
+        if (anyStatsChanged) {
+          const changedStats = statsCalculated.filter((s) => s.changed);
+          for (const stat of changedStats) {
+            try {
+              await this.obsClient.setText(stat.obsSourceName, stat.value);
+              this.previousStatValues.set(stat.obsSourceName, stat.value);
+            } catch (error) {
+              console.error(
+                `[APP] Failed to update stat ${stat.obsSourceName}: ${
+                  error instanceof Error ? error.message : String(error)
+                }`
+              );
+            }
+          }
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`[POLL #${this.pollCount}] Error fetching character: ${errorMessage}`);
+        throw error; // Re-throw to trigger fail-fast in interval handler
+      }
+    }
 
   /**
    * Update OBS based on configuration mode

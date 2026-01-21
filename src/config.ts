@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
 import { Config, HpState, OBSClientConfig } from "./types.js";
+import { StatMapping, StatId } from "./stats/types.js";
 
 // Load .env.local if it exists, otherwise fall back to .env
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,37 @@ const rootDir = path.resolve(__dirname, "..");
 // Try .env.local first, then .env
 dotenv.config({ path: path.join(rootDir, ".env.local") });
 dotenv.config({ path: path.join(rootDir, ".env") }); // Won't override existing vars
+
+/**
+ * Parse stat mappings from environment variables
+ * Format: STAT_MAPPING_<N>=<stat_id>:<obs_source_name>[:<format>]
+ */
+function parseStatMappings(): StatMapping[] {
+  const mappings: StatMapping[] = [];
+
+  for (let i = 1; i <= 20; i++) {
+    const envVar = process.env[`STAT_MAPPING_${i}`];
+    if (!envVar) continue;
+
+    const parts = envVar.split(":");
+    if (parts.length < 2) {
+      console.warn(`[CONFIG] Invalid STAT_MAPPING_${i}: ${envVar}`);
+      continue;
+    }
+
+    const statId = parts[0].trim() as StatId;
+    const obsSourceName = parts[1].trim();
+    const format = parts[2]?.trim();
+
+    mappings.push({
+      statId,
+      obsSourceName,
+      format: format || undefined,
+    });
+  }
+
+  return mappings;
+}
 
 /**
  * Load and validate configuration from environment variables
@@ -43,21 +75,31 @@ export function loadConfig(): Config {
   // Build OBS configuration based on mode
   const obsConfig = buildOBSConfig(obsMode, obsWebsocketUrl, obsWebsocketPassword);
 
-  // Validate poll interval
-  if (pollIntervalMs < 1000) {
-    console.warn(
-      `POLL_INTERVAL_MS is very low (${pollIntervalMs}ms). Recommended minimum: 3000ms`
-    );
-  }
+   // Parse stat mappings
+   const statMappings = parseStatMappings();
 
-  return {
-    dnd: {
-      characterId: dndCharacterId,
-      cobaltSession: dndCobaltSession,
-    },
-    obs: obsConfig,
-    pollIntervalMs,
-  };
+   // Debug settings
+   const debugSaveApiResponse = process.env.DEBUG_SAVE_API_RESPONSE?.toLowerCase() === 'true';
+
+   // Validate poll interval
+   if (pollIntervalMs < 1000) {
+     console.warn(
+       `POLL_INTERVAL_MS is very low (${pollIntervalMs}ms). Recommended minimum: 3000ms`
+     );
+   }
+
+   return {
+     dnd: {
+       characterId: dndCharacterId,
+       cobaltSession: dndCobaltSession,
+     },
+     obs: obsConfig,
+     pollIntervalMs,
+     statMappings,
+     debug: {
+       saveApiResponse: debugSaveApiResponse,
+     },
+   };
 }
 
 /**
@@ -120,20 +162,26 @@ function buildOBSConfig(
  * Log configuration (without sensitive data)
  */
 export function logConfig(config: Config): void {
-  const sanitized = {
-    dnd: {
-      characterId: config.dnd.characterId,
-      cobaltSession: "***[REDACTED]***",
-    },
-    obs: {
-      websocketUrl: config.obs.websocketUrl,
-      websocketPassword: config.obs.websocketPassword ? "***[REDACTED]***" : undefined,
-      mode: config.obs.mode,
-      sceneName: config.obs.sceneName,
-      sourceName: config.obs.sourceName,
-    },
-    pollIntervalMs: config.pollIntervalMs,
-  };
+   const sanitized = {
+     dnd: {
+       characterId: config.dnd.characterId,
+       cobaltSession: "***[REDACTED]***",
+     },
+     obs: {
+       websocketUrl: config.obs.websocketUrl,
+       websocketPassword: config.obs.websocketPassword ? "***[REDACTED]***" : undefined,
+       mode: config.obs.mode,
+       sceneName: config.obs.sceneName,
+       sourceName: config.obs.sourceName,
+     },
+     pollIntervalMs: config.pollIntervalMs,
+     statMappings: config.statMappings.length > 0 
+       ? `${config.statMappings.length} mapping(s) configured`
+       : "No stat mappings configured",
+     debug: {
+       saveApiResponse: config.debug.saveApiResponse,
+     },
+   };
 
-  console.log("[CONFIG] Configuration loaded:", JSON.stringify(sanitized, null, 2));
+   console.log("[CONFIG] Configuration loaded:", JSON.stringify(sanitized, null, 2));
 }

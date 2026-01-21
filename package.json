@@ -8,7 +8,9 @@
     "start": "tsx src/index.ts",
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf dist",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "keywords": [
     "obs",
@@ -22,12 +24,13 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "obs-websocket-js": "^5.0.1",
-    "dotenv": "^16.0.3"
+    "dotenv": "^16.0.3",
+    "obs-websocket-js": "^5.0.1"
   },
   "devDependencies": {
     "@types/node": "^20.4.5",
+    "tsx": "^4.0.0",
     "typescript": "^5.1.6",
-    "tsx": "^4.0.0"
+    "vitest": "^4.0.17"
   }
 }

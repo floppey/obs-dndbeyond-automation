@@ -21,13 +21,15 @@ const USER_AGENT =
  * Client for fetching character data from D&D Beyond
  */
 export class DndBeyondClient {
-  private characterId: string;
-  private cobaltSession: string;
+   private characterId: string;
+   private cobaltSession: string;
+   private saveApiResponse: boolean;
 
-  constructor(characterId: string, cobaltSession: string) {
-    this.characterId = characterId;
-    this.cobaltSession = cobaltSession;
-  }
+   constructor(characterId: string, cobaltSession: string, saveApiResponse: boolean = false) {
+     this.characterId = characterId;
+     this.cobaltSession = cobaltSession;
+     this.saveApiResponse = saveApiResponse;
+   }
 
   /**
    * Fetch character data from D&D Beyond API
@@ -39,6 +41,23 @@ export class DndBeyondClient {
     try {
       const response = await this.makeRequest(url);
       return this.parseResponse(response);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to fetch D&D Beyond character: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Fetch raw character response for stat calculations
+   * @throws Error if the API request fails or response is invalid
+   */
+  async fetchRawCharacter(): Promise<DndBeyondCharacterResponse> {
+    const url = `https://character-service.dndbeyond.com/character/v5/character/${this.characterId}`;
+
+    try {
+      const response = await this.makeRequest(url);
+      return this.parseRawResponse(response);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -127,19 +146,50 @@ export class DndBeyondClient {
   }
 
   /**
-   * Sum all constitution-score modifiers from all modifier arrays
+   * Get a Set of item definition IDs that are currently active (equipped/attuned and not consumable)
+   */
+  private getActiveItemIds(data: DndBeyondCharacterResponse): Set<number> {
+    const activeIds = new Set<number>();
+
+    if (!data.inventory) return activeIds;
+
+    for (const item of data.inventory) {
+      // Skip consumables (potions, scrolls, etc.)
+      if (item.definition?.isConsumable) {
+        continue;
+      }
+
+      // Include if equipped or attuned
+      if (item.equipped || item.isAttuned) {
+        activeIds.add(item.definition.id);
+      }
+    }
+
+    return activeIds;
+  }
+
+  /**
+   * Sum all constitution-score modifiers from all modifier arrays, filtering item modifiers
    */
   private getConstitutionModifiers(
     data: DndBeyondCharacterResponse
   ): number {
+    const activeItemIds = this.getActiveItemIds(data);
     let total = 0;
 
-    // Collect all modifiers
+    // Collect all modifiers, filtering item modifiers by active items
+    const itemModifiers = data.modifiers.item.filter((mod) => {
+      if (typeof mod.componentId === "number") {
+        return activeItemIds.has(mod.componentId);
+      }
+      return true;
+    });
+
     const allModifiers: Modifier[] = [
       ...data.modifiers.race,
       ...data.modifiers.class,
       ...data.modifiers.background,
-      ...data.modifiers.item,
+      ...itemModifiers,
       ...data.modifiers.feat,
       ...data.modifiers.condition,
     ];
@@ -181,17 +231,25 @@ export class DndBeyondClient {
   }
 
   /**
-   * Sum all HP bonus modifiers
+   * Sum all HP bonus modifiers, filtering item modifiers to only active items
    */
   private getHpBonusModifiers(data: DndBeyondCharacterResponse): number {
+    const activeItemIds = this.getActiveItemIds(data);
     let total = 0;
 
-    // Collect all modifiers
+    // Collect all modifiers, filtering item modifiers by active items
+    const itemModifiers = data.modifiers.item.filter((mod) => {
+      if (typeof mod.componentId === "number") {
+        return activeItemIds.has(mod.componentId);
+      }
+      return true;
+    });
+
     const allModifiers: Modifier[] = [
       ...data.modifiers.race,
       ...data.modifiers.class,
       ...data.modifiers.background,
-      ...data.modifiers.item,
+      ...itemModifiers,
       ...data.modifiers.feat,
       ...data.modifiers.condition,
     ];
@@ -200,7 +258,8 @@ export class DndBeyondClient {
     for (const modifier of allModifiers) {
       if (
         modifier.type === "bonus" &&
-        modifier.subType === "hit-points"
+        modifier.subType === "hit-points" &&
+        !modifier.dice  // Skip modifiers with dice (consumable effects)
       ) {
         const val = modifier.fixedValue !== null ? modifier.fixedValue : modifier.value;
         if (val !== null) {
@@ -231,22 +290,90 @@ export class DndBeyondClient {
     return Math.max(0, maxHp);
   }
 
-   /**
-    * Parse D&D Beyond API response and extract HP data
-    */
-   private parseResponse(responseBody: string): CharacterHpData {
-     // Log the full API response BEFORE validation
-     try {
-       const responsePath = "api-response.json";
-       const prettyJson = JSON.stringify(JSON.parse(responseBody), null, 2);
-       fs.writeFileSync(responsePath, prettyJson);
-       console.log(`[DND] API response saved to ${responsePath}`);
-     } catch (error) {
-       console.warn(
-         `[DND] Failed to save API response: ${error instanceof Error ? error.message : String(error)}`
-       );
-     }
+    /**
+     * Parse D&D Beyond API response and extract HP data
+     */
+    private parseResponse(responseBody: string): CharacterHpData {
+      // Only save API response if debug setting is enabled
+      if (this.saveApiResponse) {
+        try {
+          const responsePath = "api-response.json";
+          const prettyJson = JSON.stringify(JSON.parse(responseBody), null, 2);
+          fs.writeFileSync(responsePath, prettyJson);
+          console.log(`[DND] API response saved to ${responsePath}`);
+        } catch (error) {
+          console.warn(
+            `[DND] Failed to save API response: ${error instanceof Error ? error.message : String(error)}`
+          );
+        }
+      }
 
+      let apiWrapper: { success?: boolean; data?: DndBeyondCharacterResponse };
+      let parsedResponse: DndBeyondCharacterResponse;
+
+      try {
+        apiWrapper = JSON.parse(responseBody);
+      } catch (error) {
+        throw new Error("Failed to parse API response as JSON");
+      }
+
+      // Unwrap the data if it's wrapped in an API response envelope
+      if (apiWrapper && apiWrapper.data) {
+        parsedResponse = apiWrapper.data;
+      } else if (apiWrapper && typeof apiWrapper === "object" && "baseHitPoints" in apiWrapper) {
+        // If it's already the character data, use it directly
+        parsedResponse = apiWrapper as DndBeyondCharacterResponse;
+      } else {
+        throw new Error("Invalid API response structure: missing character data");
+      }
+
+      // Validate required fields
+      if (typeof parsedResponse.baseHitPoints !== "number") {
+        throw new Error("Missing or invalid baseHitPoints in API response");
+      }
+      if (!Array.isArray(parsedResponse.stats) || parsedResponse.stats.length < 3) {
+        throw new Error("Missing or invalid stats in API response");
+      }
+      if (!parsedResponse.modifiers) {
+        throw new Error("Missing modifiers in API response");
+      }
+      if (!parsedResponse.classes) {
+        throw new Error("Missing classes in API response");
+      }
+
+     // Calculate max HP using new logic
+     const maxHp = this.calculateMaxHp(parsedResponse);
+
+     // Get current HP (max HP minus damage taken)
+     const currentHp = Math.max(0, maxHp - (parsedResponse.removedHitPoints || 0));
+     const temporaryHp = parsedResponse.temporaryHitPoints || 0;
+
+     // Calculate HP percentage
+     const hpPercentage = maxHp > 0 ? (currentHp / maxHp) * 100 : 0;
+
+     // Determine HP state
+     const state = calculateHpState(
+       currentHp,
+       maxHp,
+       parsedResponse.isDead,
+       parsedResponse.deathSaves
+     );
+
+      return {
+        currentHp,
+        maxHp,
+        temporaryHp,
+        hpPercentage,
+        state,
+        isDead: parsedResponse.isDead || false,
+        deathSaves: parsedResponse.deathSaves || { successes: 0, failures: 0 },
+      };
+    }
+
+   /**
+    * Parse D&D Beyond API response and extract raw character data
+    */
+   private parseRawResponse(responseBody: string): DndBeyondCharacterResponse {
      let apiWrapper: { success?: boolean; data?: DndBeyondCharacterResponse };
      let parsedResponse: DndBeyondCharacterResponse;
 
@@ -259,7 +386,11 @@ export class DndBeyondClient {
      // Unwrap the data if it's wrapped in an API response envelope
      if (apiWrapper && apiWrapper.data) {
        parsedResponse = apiWrapper.data;
-     } else if (apiWrapper && typeof apiWrapper === "object" && "baseHitPoints" in apiWrapper) {
+     } else if (
+       apiWrapper &&
+       typeof apiWrapper === "object" &&
+       "baseHitPoints" in apiWrapper
+     ) {
        // If it's already the character data, use it directly
        parsedResponse = apiWrapper as DndBeyondCharacterResponse;
      } else {
@@ -280,32 +411,6 @@ export class DndBeyondClient {
        throw new Error("Missing classes in API response");
      }
 
-    // Calculate max HP using new logic
-    const maxHp = this.calculateMaxHp(parsedResponse);
-
-    // Get current HP (max HP minus damage taken)
-    const currentHp = Math.max(0, maxHp - (parsedResponse.removedHitPoints || 0));
-    const temporaryHp = parsedResponse.temporaryHitPoints || 0;
-
-    // Calculate HP percentage
-    const hpPercentage = maxHp > 0 ? (currentHp / maxHp) * 100 : 0;
-
-    // Determine HP state
-    const state = calculateHpState(
-      currentHp,
-      maxHp,
-      parsedResponse.isDead,
-      parsedResponse.deathSaves
-    );
-
-    return {
-      currentHp,
-      maxHp,
-      temporaryHp,
-      hpPercentage,
-      state,
-      isDead: parsedResponse.isDead || false,
-      deathSaves: parsedResponse.deathSaves || { successes: 0, failures: 0 },
-    };
-  }
+     return parsedResponse;
+   }
 }

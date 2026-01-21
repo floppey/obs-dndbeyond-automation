@@ -111,46 +111,73 @@ export class OBSClient {
     }
   }
 
-  /**
-   * Set scene item visibility (for visibility_toggle mode)
-   * @param sceneName - Name of the scene
-   * @param itemName - Name of the scene item (source name in the scene)
-   * @param visible - Whether to show or hide the item
-   * @throws Error if update fails
-   */
-  async setSourceVisibility(
-    sceneName: string,
-    itemName: string,
-    visible: boolean
-  ): Promise<void> {
-    if (!this.connected) {
-      throw new Error("Not connected to OBS WebSocket");
-    }
+   /**
+    * Set scene item visibility (for visibility_toggle mode)
+    * @param sceneName - Name of the scene
+    * @param itemName - Name of the scene item (source name in the scene)
+    * @param visible - Whether to show or hide the item
+    * @throws Error if update fails
+    */
+   async setSourceVisibility(
+     sceneName: string,
+     itemName: string,
+     visible: boolean
+   ): Promise<void> {
+     if (!this.connected) {
+       throw new Error("Not connected to OBS WebSocket");
+     }
 
-    try {
-      // Get scene item ID first
-      const sceneItemResponse = await this.obs.call("GetSceneItemId", {
-        sceneName: sceneName,
-        sourceName: itemName,
-      });
+     try {
+       // Get scene item ID first
+       const sceneItemResponse = await this.obs.call("GetSceneItemId", {
+         sceneName: sceneName,
+         sourceName: itemName,
+       });
 
-      const sceneItemId = sceneItemResponse.sceneItemId as number;
+       const sceneItemId = sceneItemResponse.sceneItemId as number;
 
-      // Then set its visibility
-      await this.obs.call("SetSceneItemEnabled", {
-        sceneName: sceneName,
-        sceneItemId: sceneItemId,
-        sceneItemEnabled: visible,
-      });
+       // Then set its visibility
+       await this.obs.call("SetSceneItemEnabled", {
+         sceneName: sceneName,
+         sceneItemId: sceneItemId,
+         sceneItemEnabled: visible,
+       });
 
-      const state = visible ? "shown" : "hidden";
-      console.log(`[OBS] ✓ Scene item "${itemName}" in scene "${sceneName}" is now ${state}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      // Don't throw on visibility errors - some items might not exist
-      console.warn(
-        `[OBS] Warning: Failed to set visibility for "${itemName}": ${errorMessage}`
-      );
-    }
-  }
+       const state = visible ? "shown" : "hidden";
+       console.log(`[OBS] ✓ Scene item "${itemName}" in scene "${sceneName}" is now ${state}`);
+     } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : String(error);
+       // Don't throw on visibility errors - some items might not exist
+       console.warn(
+         `[OBS] Warning: Failed to set visibility for "${itemName}": ${errorMessage}`
+       );
+     }
+   }
+
+   /**
+    * Set text source content (for stat display)
+    * @param sourceName - Name of the text source in OBS
+    * @param text - Text content to display
+    * @throws Error if update fails
+    */
+   async setText(sourceName: string, text: string): Promise<void> {
+     if (!this.connected) {
+       throw new Error("Not connected to OBS WebSocket");
+     }
+
+     try {
+       await this.obs.call("SetInputSettings", {
+         inputName: sourceName,
+         inputSettings: {
+           text: text,
+         },
+       });
+       console.log(`[OBS] ✓ Updated text "${sourceName}": ${text}`);
+     } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : String(error);
+       console.warn(
+         `[OBS] Warning: Failed to set text for "${sourceName}": ${errorMessage}`
+       );
+     }
+   }
 }
