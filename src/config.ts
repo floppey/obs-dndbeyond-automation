@@ -8,6 +8,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { Config, HpState, OBSClientConfig } from "./types.js";
 import { StatMapping, StatId } from "./stats/types.js";
+import { GameLogConfig } from "./game-log/types.js";
 
 // Load .env.local if it exists, otherwise fall back to .env
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -16,6 +17,16 @@ const rootDir = path.resolve(__dirname, "..");
 // Try .env.local first, then .env
 dotenv.config({ path: path.join(rootDir, ".env.local") });
 dotenv.config({ path: path.join(rootDir, ".env") }); // Won't override existing vars
+
+/**
+ * Process escape sequences in a string (e.g., \n -> newline, \t -> tab)
+ */
+function processEscapeSequences(str: string): string {
+  return str
+    .replace(/\\n/g, '\n')
+    .replace(/\\t/g, '\t')
+    .replace(/\\r/g, '\r');
+}
 
 /**
  * Parse stat mappings from environment variables
@@ -34,18 +45,74 @@ function parseStatMappings(): StatMapping[] {
       continue;
     }
 
-    const statId = parts[0].trim() as StatId;
-    const obsSourceName = parts[1].trim();
-    const format = parts[2]?.trim();
+     const statId = parts[0].trim() as StatId;
+     const obsSourceName = parts[1].trim();
+     const format = parts[2]?.trim();
 
-    mappings.push({
-      statId,
-      obsSourceName,
-      format: format || undefined,
-    });
+     mappings.push({
+       statId,
+       obsSourceName,
+       format: format ? processEscapeSequences(format) : undefined,
+     });
   }
 
   return mappings;
+}
+
+/**
+ * Parse game log configuration from environment variables
+ */
+function parseGameLogConfig(cobaltSession: string): GameLogConfig | undefined {
+  const enabled = process.env.GAME_LOG_ENABLED?.toLowerCase() === "true";
+
+  // If disabled, return undefined
+  if (!enabled) {
+    return undefined;
+  }
+
+  const gameId = process.env.GAME_LOG_GAME_ID;
+  const userId = process.env.GAME_LOG_USER_ID;
+  const pollIntervalMs = parseInt(process.env.GAME_LOG_POLL_INTERVAL_MS || "3000", 10);
+  const lastRollSource = process.env.LAST_ROLL_SOURCE;
+  const lastRollFormat = process.env.LAST_ROLL_FORMAT;
+  const rollHistorySource = process.env.ROLL_HISTORY_SOURCE;
+  const rollHistoryFormat = process.env.ROLL_HISTORY_FORMAT;
+  const rollHistoryCount = parseInt(process.env.ROLL_HISTORY_COUNT || "5", 10);
+
+  // Validate required fields if game log is enabled
+  if (!gameId) {
+    throw new Error("Game log enabled but GAME_LOG_GAME_ID is not set");
+  }
+  if (!userId) {
+    throw new Error("Game log enabled but GAME_LOG_USER_ID is not set");
+  }
+
+  const config: GameLogConfig = {
+    enabled: true,
+    gameId,
+    userId,
+    cobaltSession,
+    pollIntervalMs,
+  };
+
+   // Add last roll config if source is specified
+   if (lastRollSource) {
+     config.lastRoll = {
+       sourceName: lastRollSource,
+       format: processEscapeSequences(lastRollFormat || "{action}: {total}"),
+     };
+   }
+
+   // Add roll history config if source is specified
+   if (rollHistorySource) {
+     config.rollHistory = {
+       sourceName: rollHistorySource,
+       format: processEscapeSequences(rollHistoryFormat || "{action} {total}"),
+       count: rollHistoryCount,
+     };
+   }
+
+  return config;
 }
 
 /**
@@ -75,11 +142,21 @@ export function loadConfig(): Config {
   // Build OBS configuration based on mode
   const obsConfig = buildOBSConfig(obsMode, obsWebsocketUrl, obsWebsocketPassword);
 
-   // Parse stat mappings
-   const statMappings = parseStatMappings();
+    // Parse stat mappings
+    const statMappings = parseStatMappings();
 
-   // Debug settings
-   const debugSaveApiResponse = process.env.DEBUG_SAVE_API_RESPONSE?.toLowerCase() === 'true';
+    // Parse game log configuration
+    let gameLogConfig: GameLogConfig | undefined;
+    try {
+      gameLogConfig = parseGameLogConfig(dndCobaltSession);
+    } catch (error) {
+      console.warn(
+        `[CONFIG] Game log configuration error: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+
+    // Debug settings
+    const debugSaveApiResponse = process.env.DEBUG_SAVE_API_RESPONSE?.toLowerCase() === 'true';
 
    // Validate poll interval
    if (pollIntervalMs < 1000) {
@@ -88,18 +165,19 @@ export function loadConfig(): Config {
      );
    }
 
-   return {
-     dnd: {
-       characterId: dndCharacterId,
-       cobaltSession: dndCobaltSession,
-     },
-     obs: obsConfig,
-     pollIntervalMs,
-     statMappings,
-     debug: {
-       saveApiResponse: debugSaveApiResponse,
-     },
-   };
+    return {
+      dnd: {
+        characterId: dndCharacterId,
+        cobaltSession: dndCobaltSession,
+      },
+      obs: obsConfig,
+      pollIntervalMs,
+      statMappings,
+      gameLog: gameLogConfig,
+      debug: {
+        saveApiResponse: debugSaveApiResponse,
+      },
+    };
 }
 
 /**
@@ -178,6 +256,16 @@ export function logConfig(config: Config): void {
      statMappings: config.statMappings.length > 0 
        ? `${config.statMappings.length} mapping(s) configured`
        : "No stat mappings configured",
+     gameLog: config.gameLog
+       ? {
+           enabled: config.gameLog.enabled,
+           gameId: config.gameLog.gameId,
+           userId: config.gameLog.userId,
+           pollIntervalMs: config.gameLog.pollIntervalMs,
+           lastRoll: config.gameLog.lastRoll ? "configured" : "not configured",
+           rollHistory: config.gameLog.rollHistory ? "configured" : "not configured",
+         }
+       : "Not configured",
      debug: {
        saveApiResponse: config.debug.saveApiResponse,
      },

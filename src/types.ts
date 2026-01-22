@@ -3,6 +3,7 @@
  */
 
 import { StatMapping } from "./stats/types.js";
+import { GameLogConfig } from "./game-log/types.js";
 
 /**
  * HP health states mapped from percentage
@@ -157,6 +158,7 @@ export interface Config {
   obs: OBSClientConfig;
   pollIntervalMs: number;
   statMappings: StatMapping[];
+  gameLog?: GameLogConfig;
   debug: {
     saveApiResponse: boolean;
   };

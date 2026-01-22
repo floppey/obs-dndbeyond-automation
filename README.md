@@ -1,6 +1,6 @@
 # OBS D&D Beyond Automation
 
-Automatically synchronize D&D Beyond character data with OBS for live streaming overlays. Display HP states AND real-time character stats (AC, ability scores, modifiers, initiative, passives, and more) directly in your stream.
+Automatically synchronize D&D Beyond character data with OBS for live streaming overlays. Display HP states, real-time character stats, AND live dice rolls directly in your stream.
 
 ## Quick Start
 
@@ -59,7 +59,30 @@ STAT_MAPPING_4=passive_perception:Text_PP:PP {value}
 STAT_MAPPING_5=initiative:Text_Initiative:{value}
 ```
 
-### 6. Start the Application
+### 6. (Optional) Configure Dice Roll Display
+
+Display your dice rolls from D&D Beyond's game log:
+```env
+# Enable game log polling
+GAME_LOG_ENABLED=true
+GAME_LOG_GAME_ID=your_campaign_id
+GAME_LOG_USER_ID=your_user_id
+
+# Last roll display (most recent roll)
+LAST_ROLL_SOURCE=Text_LastRoll
+LAST_ROLL_FORMAT={action}: {total}
+
+# Roll history (previous rolls, excluding the last roll)
+ROLL_HISTORY_SOURCE=Text_RollHistory
+ROLL_HISTORY_FORMAT={action} {total}
+ROLL_HISTORY_COUNT=5
+```
+
+**Finding your IDs:**
+- **Game ID**: Open your campaign, check Network tab for requests to `game-log-rest-live.dndbeyond.com`, find `gameId` parameter
+- **User ID**: Same request will show your `userId` parameter
+
+### 7. Start the Application
 ```bash
 npm start
 ```
@@ -88,6 +111,13 @@ npm run dev
 - ✅ **Formatted Output**: Modifiers display with +/- signs, speeds with "ft." suffix
 - ✅ **Flexible Formatting**: Use `{value}` placeholders in custom formats
 - ✅ **Combat Ready**: Initiative, AC, spell DCs, passive checks all available
+
+### 🎲 Live Dice Rolls (New!)
+- ✅ **Real-time Roll Display**: See your D&D Beyond dice rolls in OBS
+- ✅ **Last Roll + History**: Separate displays for most recent roll and roll history
+- ✅ **Flexible Formatting**: Customize how rolls appear with placeholders
+- ✅ **Your Rolls Only**: Filters to show only your character's rolls
+- ✅ **All Roll Types**: Attacks, saves, checks, damage, healing - all supported
 
 ### 🛡️ General Reliability
 - ✅ **Type-Safe**: Full TypeScript coverage
@@ -189,6 +219,124 @@ STAT_MAPPING_6=spell_save_dc:Text_SpellDC
 - **`spell_save_dc`** - Spell Save DC (8 + proficiency + spellcasting ability mod)
 - **`spell_attack`** - Spell attack modifier ("+5" or "-1")
 
+## Dice Roll Configuration
+
+### Overview
+
+Display your D&D Beyond dice rolls in real-time on your OBS overlay. Requires your character to be in a campaign.
+
+### Setup
+
+```env
+# Enable game log polling
+GAME_LOG_ENABLED=true
+
+# Your campaign/game ID (from D&D Beyond URL or Network tab)
+GAME_LOG_GAME_ID=1234567
+
+# Your D&D Beyond user ID (from Network tab)
+GAME_LOG_USER_ID=12345678
+
+# Poll interval in milliseconds (default: 3000)
+GAME_LOG_POLL_INTERVAL_MS=3000
+```
+
+### Last Roll Display
+
+Shows your most recent dice roll:
+
+```env
+# OBS text source name
+LAST_ROLL_SOURCE=Text_LastRoll
+
+# Format string with placeholders
+LAST_ROLL_FORMAT={action}: {total}
+```
+
+**Example outputs:**
+- `Persuasion: 21`
+- `Attack Roll: 18`
+- `Fireball: 32`
+
+### Roll History Display
+
+Shows previous rolls (excludes the most recent, which is shown in Last Roll):
+
+```env
+# OBS text source name
+ROLL_HISTORY_SOURCE=Text_RollHistory
+
+# Format for each line
+ROLL_HISTORY_FORMAT={action} {total}
+
+# Number of rolls to show
+ROLL_HISTORY_COUNT=5
+```
+
+**Example output:**
+```
+Perception 17
+Intimidation 21
+Persuasion 14
+Athletics 16
+Stealth 12
+```
+
+### Available Placeholders
+
+| Placeholder | Example | Description |
+|-------------|---------|-------------|
+| `{character}` | `Kan` | Character name |
+| `{action}` | `Persuasion` | What was rolled (skill, attack, spell, etc.) |
+| `{total}` | `21` | Final roll result |
+| `{breakdown}` | `(14,20)+1` | Dice breakdown showing individual rolls |
+| `{roll_type}` | `check` | Type: check, save, to hit, heal, roll |
+| `{roll_kind}` | `advantage` | Advantage, disadvantage, or blank |
+| `{dice}` | `2d20+5` | Dice notation |
+| `{values}` | `14, 20` | Individual die values |
+
+### Format Examples
+
+**Simple (just the result):**
+```env
+LAST_ROLL_FORMAT={action}: {total}
+# Output: "Persuasion: 21"
+```
+
+**With advantage indicator:**
+```env
+LAST_ROLL_FORMAT={action}: {total} {roll_kind}
+# Output: "Persuasion: 21 advantage"
+```
+
+**Detailed breakdown:**
+```env
+LAST_ROLL_FORMAT={action} ({roll_type}): {breakdown} = {total}
+# Output: "Persuasion (check): (14,20)+1 = 21"
+```
+
+**Compact history:**
+```env
+ROLL_HISTORY_FORMAT={action} {total}
+# Output: "Perception 17"
+```
+
+**History with character name (for multi-character setups):**
+```env
+ROLL_HISTORY_FORMAT={character}: {action} {total}
+# Output: "Kan: Perception 17"
+```
+
+### Finding Your Game ID and User ID
+
+1. Open your D&D Beyond campaign page
+2. Open browser DevTools (F12) → Network tab
+3. Make a dice roll on your character sheet
+4. Look for a request to `game-log-rest-live.dndbeyond.com`
+5. Check the URL parameters:
+   - `gameId=XXXXXXX` → Your Game ID
+   - `userId=XXXXXXXX` → Your User ID
+
 ## Scripts
 
 ```bash
@@ -201,41 +349,41 @@ npm run clean      # Remove compiled files
 ## Architecture
 
 ```
-┌─────────────────────────────────┐
-│   Main Polling Loop (index.ts)   │
-│     Every 5-10 seconds           │
-└────────────────┬────────────────┘
-                 │
-     ┌───────────┴───────────┐
-     ▼                       ▼
-┌──────────────┐     ┌──────────────────┐
-│ Poll D&D     │     │ Track Previous   │
-│ Beyond API   │     │ HP State & Stats │
-└──────┬───────┘     └──────┬───────────┘
-       │                    │
-       └────────┬───────────┘
-                ▼
-     ┌────────────────────────┐
-     │ Calculate HP State &   │
-     │ Character Stats        │
-     └────────────┬───────────┘
-                  │
-        ┌─────────┴────────────┐
-        │                      │
-        ▼                      ▼
-   ┌──────────┐         ┌──────────────┐
-   │ HP State │         │ Stat Values  │
-   │ Changed? │         │ Changed?     │
-   └────┬─────┘         └────┬─────────┘
-        │                    │
-   ┌────┴────────┬───────────┴────┐
-   ▼             ▼                ▼
- [Yes]        [Yes]            [No]
-   │             │              │
-   ▼             ▼              ▼
-Update OBS  Update Text     Continue
- Visibility Sources
- / Image
+┌──────────────────────────────────────────────────────────────┐
+│                    OBS D&D Beyond Automation                  │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   Character Poll Loop          Game Log Poll Loop            │
+│   (every 5-15 seconds)         (every 3 seconds)             │
+│          │                            │                      │
+│          ▼                            ▼                      │
+│   ┌─────────────┐             ┌─────────────────┐            │
+│   │ D&D Beyond  │             │ D&D Beyond      │            │
+│   │ Character   │             │ Game Log API    │            │
+│   │ API         │             │ (Bearer Token)  │            │
+│   └──────┬──────┘             └────────┬────────┘            │
+│          │                             │                     │
+│          ▼                             ▼                     │
+│   ┌─────────────┐             ┌─────────────────┐            │
+│   │ HP State &  │             │ Parse & Filter  │            │
+│   │ Stats Calc  │             │ Dice Rolls      │            │
+│   └──────┬──────┘             └────────┬────────┘            │
+│          │                             │                     │
+│          └──────────────┬──────────────┘                     │
+│                         ▼                                    │
+│              ┌─────────────────────┐                         │
+│              │  Update OBS         │                         │
+│              │  (only on changes)  │                         │
+│              └─────────────────────┘                         │
+│                         │                                    │
+│         ┌───────────────┼───────────────┐                    │
+│         ▼               ▼               ▼                    │
+│   ┌──────────┐   ┌──────────┐   ┌──────────────┐             │
+│   │ HP Image │   │ Stat     │   │ Dice Roll    │             │
+│   │ /Toggle  │   │ Text     │   │ Text Sources │             │
+│   └──────────┘   └──────────┘   └──────────────┘             │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## HP State Thresholds
@@ -270,6 +418,11 @@ obs-dndbeyond-automation/
 │   │   ├── calculator.ts          # Stat value computation
 │   │   ├── definitions.ts         # All stat definitions
 │   │   └── types.ts               # Stat types
+│   ├── game-log/
+│   │   ├── index.ts               # Game log exports
+│   │   ├── client.ts              # Game log API client
+│   │   ├── formatter.ts           # Roll formatting
+│   │   └── types.ts               # Game log types
 │   └── obs/
 │       └── client.ts              # OBS WebSocket client
 └── dist/                           # Compiled output (generated)
@@ -308,6 +461,17 @@ obs-dndbeyond-automation/
 - Check that OBS text sources exist and have exact names from config
 - Ensure stat IDs match the available stats list above
 - If using custom format, include `{value}` placeholder
+
+### Dice rolls not appearing
+- Verify `GAME_LOG_ENABLED=true`
+- Check `GAME_LOG_GAME_ID` and `GAME_LOG_USER_ID` are correct
+- Ensure your character is in a campaign (game log requires campaign membership)
+- Make a roll on D&D Beyond and check console for `[GAME_LOG]` messages
+- Verify OBS text sources exist with exact names from config
+
+### "Failed to fetch bearer token" error
+- Get a fresh `DND_COBALT_SESSION` cookie from browser DevTools
+- The cobalt session may have expired
 
 ## Development
 
@@ -386,6 +550,15 @@ A: The calculator uses equipped/attuned items and all active modifiers (race, cl
 
 **Q: Does it work with temporary HP, abilities, buffs, etc.?**  
 A: Yes! It reads the full character data including temp HP, all ability modifiers, item bonuses, feat bonuses, and active conditions.
+
+**Q: Can I show dice rolls from my whole party?**  
+A: Currently only your own rolls are displayed (filtered by `GAME_LOG_USER_ID`). This keeps your overlay focused on your character.
+
+**Q: Why don't I see my dice rolls?**  
+A: Dice roll display requires your character to be in a campaign. The game log API only works for campaign play, not standalone character sheets.
+
+**Q: Can I customize which rolls appear?**  
+A: All roll types (checks, saves, attacks, damage, healing) are shown. Filtering by roll type is not yet supported but could be added.
 
 ## Support
 
