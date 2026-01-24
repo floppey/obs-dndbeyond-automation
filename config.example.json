@@ -1,0 +1,56 @@
+{
+  "dndBeyond": {
+    "characterId": "123456789",
+    "cobaltSession": "your_cobalt_session_token_here"
+  },
+  "obs": {
+    "websocketUrl": "ws://localhost:4455",
+    "websocketPassword": "your_obs_websocket_password",
+    "mode": "image_swap",
+    "sourceName": "CharacterPortrait",
+    "images": {
+      "healthy": "C:/path/to/images/healthy.png",
+      "scratched": "C:/path/to/images/scratched.png",
+      "bloodied": "C:/path/to/images/bloodied.png",
+      "dying": "C:/path/to/images/dying.png",
+      "unconscious": "C:/path/to/images/unconscious.png"
+    }
+  },
+  "polling": {
+    "intervalMs": 5000
+  },
+  "statMappings": [
+    {
+      "statId": "ac",
+      "obsSourceName": "ACDisplay",
+      "format": "AC: {value}"
+    },
+    {
+      "statId": "hp_display",
+      "obsSourceName": "HPDisplay"
+    },
+    {
+      "statId": "initiative",
+      "obsSourceName": "InitiativeDisplay",
+      "format": "+{value}"
+    }
+  ],
+  "gameLog": {
+    "enabled": true,
+    "gameId": "your_game_id",
+    "userId": "your_user_id",
+    "pollIntervalMs": 3000,
+    "lastRoll": {
+      "sourceName": "LastRoll",
+      "format": "{character} {action} = {total}"
+    },
+    "rollHistory": {
+      "sourceName": "RollHistory",
+      "format": "{character} {action} = {total}",
+      "count": 5
+    }
+  },
+  "debug": {
+    "saveApiResponse": false
+  }
+}

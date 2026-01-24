@@ -3,7 +3,8 @@
  * Implements the polling loop that keeps OBS in sync with character HP
  */
 
-import { loadConfig, logConfig } from "./config.js";
+import { logConfig } from "./config.js";
+import { loadOrCreateConfig } from "./config/index.js";
 import { DndBeyondClient } from "./dnd-beyond/client.js";
 import { formatHpInfo } from "./dnd-beyond/hp-calculator.js";
 import { OBSClient } from "./obs/client.js";
@@ -33,8 +34,7 @@ class OBSDndBeyondAutomation {
   private pollCount = 0;
   private gameLogPollCount = 0;
 
-    constructor() {
-      const config = loadConfig();
+    constructor(config: Config) {
       logConfig(config);
 
       this.config = config;
@@ -409,8 +409,15 @@ class OBSDndBeyondAutomation {
  * Start the application
  */
 async function main(): Promise<void> {
-  const app = new OBSDndBeyondAutomation();
-  await app.start();
+  try {
+    console.log("[APP] Loading configuration...");
+    const config = await loadOrCreateConfig();
+    const app = new OBSDndBeyondAutomation(config);
+    await app.start();
+  } catch (error) {
+    console.error(`[FATAL] ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
 }
 
 // Run the application
