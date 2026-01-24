@@ -9,13 +9,37 @@ Automatically synchronize D&D Beyond character data with OBS for live streaming 
 npm install
 ```
 
-### 2. Configure Environment
+### 2. Configure Using Interactive Setup (Recommended)
+
+On first run, the application will automatically launch an interactive configuration wizard:
+
 ```bash
-cp .env.example .env
-# Edit .env with your D&D Beyond credentials and OBS settings
+npm run dev
 ```
 
-### 3. Get Your Credentials
+The wizard will guide you through:
+- D&D Beyond credentials (Character ID and Cobalt Session)
+- OBS WebSocket connection (URL and optional password)
+- HP display mode (image_swap or visibility_toggle)
+- Mode-specific settings (source/scene names, image paths)
+- Optional polling interval, stat mappings, and game log settings
+
+Your configuration will be saved to `config.json` for future runs.
+
+**To re-run the setup wizard at any time:**
+```bash
+npm run dev -- --setup
+```
+
+### 3. Manual Configuration (Alternative)
+
+If you prefer to manually create `config.json`, copy the example:
+```bash
+cp config.example.json config.json
+# Edit config.json with your settings
+```
+
+**Finding your Credentials:**
 
 **D&D Beyond Character ID:**
 - Visit your character sheet at `https://www.dndbeyond.com/characters/{CHARACTER_ID}/...`
@@ -28,40 +52,92 @@ cp .env.example .env
 4. Find a request to `character-service.dndbeyond.com`
 5. In Request Headers, copy the `cobalt-session` cookie value
 
-### 4. Choose HP State Display Mode
+### 4. Alternative: Use Environment Variables (Legacy)
+
+For backward compatibility, you can still use `.env` files:
+```bash
+cp .env.example .env
+# Edit .env with your D&D Beyond credentials and OBS settings
+```
+
+### 5. HP State Display Mode
+
+If using manual config.json, choose your HP display mode:
 
 **Option A: Image Swap Mode** (swap portrait images based on HP)
-```env
-OBS_MODE=image_swap
-OBS_SOURCE_NAME=Character_Portrait
-OBS_IMAGE_HEALTHY=C:/obs-images/healthy.png
-OBS_IMAGE_SCRATCHED=C:/obs-images/scratched.png
-OBS_IMAGE_BLOODIED=C:/obs-images/bloodied.png
-OBS_IMAGE_DYING=C:/obs-images/dying.png
-OBS_IMAGE_UNCONSCIOUS=C:/obs-images/unconscious.png
+```json
+{
+  "obs": {
+    "mode": "image_swap",
+    "sourceName": "Character_Portrait",
+    "images": {
+      "healthy": "C:/obs-images/healthy.png",
+      "scratched": "C:/obs-images/scratched.png",
+      "bloodied": "C:/obs-images/bloodied.png",
+      "dying": "C:/obs-images/dying.png",
+      "unconscious": "C:/obs-images/unconscious.png"
+    }
+  }
+}
 ```
 
 **Option B: Visibility Toggle Mode** (show/hide scene items based on HP)
-```env
-OBS_MODE=visibility_toggle
-OBS_SCENE_NAME=D&D Overlay
+```json
+{
+  "obs": {
+    "mode": "visibility_toggle",
+    "sceneName": "D&D Overlay"
+  }
+}
 ```
 Then create scene items in OBS with these exact names: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 
-### 5. (Optional) Configure Stat Display
+### 6. (Optional) Configure Stat Display
 
 Map any character stat to an OBS text source:
+```json
+{
+  "statMappings": [
+    { "statId": "ac", "obsSourceName": "Text_AC", "format": "AC: {value}" },
+    { "statId": "hp_display", "obsSourceName": "Text_HP" },
+    { "statId": "level", "obsSourceName": "Text_Level", "format": "Lvl {value}" },
+    { "statId": "passive_perception", "obsSourceName": "Text_PP", "format": "PP {value}" },
+    { "statId": "initiative", "obsSourceName": "Text_Initiative" }
+  ]
+}
+```
+
+Or with environment variables (legacy):
 ```env
 STAT_MAPPING_1=ac:Text_AC:AC {value}
 STAT_MAPPING_2=hp_display:Text_HP
 STAT_MAPPING_3=level:Text_Level:Lvl {value}
-STAT_MAPPING_4=passive_perception:Text_PP:PP {value}
-STAT_MAPPING_5=initiative:Text_Initiative:{value}
 ```
 
-### 6. (Optional) Configure Dice Roll Display
+### 7. (Optional) Configure Dice Roll Display
 
 Display your dice rolls from D&D Beyond's game log:
+```json
+{
+  "gameLog": {
+    "enabled": true,
+    "gameId": "your_campaign_id",
+    "userId": "your_user_id",
+    "pollIntervalMs": 3000,
+    "lastRoll": {
+      "sourceName": "Text_LastRoll",
+      "format": "{action}: {total}"
+    },
+    "rollHistory": {
+      "sourceName": "Text_RollHistory",
+      "format": "{action} {total}",
+      "count": 5
+    }
+  }
+}
+```
+
+Or with environment variables (legacy):
 ```env
 # Enable game log polling
 GAME_LOG_ENABLED=true
@@ -82,7 +158,7 @@ ROLL_HISTORY_COUNT=5
 - **Game ID**: Open your campaign, check Network tab for requests to `game-log-rest-live.dndbeyond.com`, find `gameId` parameter
 - **User ID**: Same request will show your `userId` parameter
 
-### 7. Start the Application
+### 8. Start the Application
 ```bash
 npm start
 ```
@@ -91,8 +167,6 @@ For development with auto-reload:
 ```bash
 npm run dev
 ```
-
-## Features
 
 ### 🩸 HP State Tracking (Original Feature)
 - ✅ **Real-time HP Sync**: Polls D&D Beyond every 5-10 seconds (configurable)
