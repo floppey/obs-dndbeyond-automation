@@ -406,6 +406,24 @@ class OBSDndBeyondAutomation {
 }
 
 /**
+ * Helper to keep console window open until user presses a key
+ * Only waits if running in a terminal (not piped/redirected)
+ */
+async function waitForKeypress(): Promise<void> {
+  // Only wait if running in a terminal (not piped)
+  if (process.stdin.isTTY) {
+    console.log("\n🔑 Press any key to exit...");
+    process.stdin.setRawMode(true);
+    return new Promise((resolve) => {
+      process.stdin.once("data", () => {
+        process.stdin.setRawMode(false);
+        resolve();
+      });
+    });
+  }
+}
+
+/**
  * Start the application
  */
 async function main(): Promise<void> {
@@ -415,13 +433,28 @@ async function main(): Promise<void> {
     const app = new OBSDndBeyondAutomation(config);
     await app.start();
   } catch (error) {
-    console.error(`[FATAL] ${error instanceof Error ? error.message : String(error)}`);
+    const errorMessage =
+      error instanceof Error ? error.message : String(error);
+    const errorStack =
+      error instanceof Error && error.stack ? `\n${error.stack}` : "";
+    console.error(
+      `\n❌ [FATAL ERROR] Application crashed during startup: ${errorMessage}${errorStack}`
+    );
+    await waitForKeypress();
     process.exit(1);
   }
 }
 
 // Run the application
 main().catch((error) => {
-  console.error(`[FATAL] ${error instanceof Error ? error.message : String(error)}`);
-  process.exit(1);
+  const errorMessage =
+    error instanceof Error ? error.message : String(error);
+  const errorStack =
+    error instanceof Error && error.stack ? `\n${error.stack}` : "";
+  console.error(
+    `\n❌ [FATAL ERROR] Uncaught exception: ${errorMessage}${errorStack}`
+  );
+  waitForKeypress().then(() => {
+    process.exit(1);
+  });
 });

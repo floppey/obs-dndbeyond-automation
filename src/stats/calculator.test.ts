@@ -91,9 +91,8 @@ describe('StatCalculator', () => {
       const data = createMockCharacterData();
       const mappings = [
         { statId: 'level' as const, obsSourceName: 'level_text' },
-        // @ts-ignore - intentionally invalid
         { statId: 'invalid_stat', obsSourceName: 'invalid_text' },
-      ];
+      ] as any;
 
       const results = calculator.calculateMappings(mappings, data);
 

@@ -10,3 +10,5 @@ dist/
 *~
 .env.local
 api-response.json
+release/
+config.json
