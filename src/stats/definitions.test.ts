@@ -9,6 +9,7 @@ import {
   getTotalLevel,
   getActiveItemIds,
   getAbilityScore,
+  isWearingArmor,
   statDefinitions,
 } from '../stats/definitions.js';
 import { createMockCharacterData } from '../__fixtures__/character-data.js';
@@ -322,5 +323,355 @@ describe('statDefinitions.ac.calculate', () => {
     });
     const ac = statDefinitions.ac.calculate(data);
     expect(ac).toBe(10); // 10 + (-4) = 6, but minimum is 10
+  });
+
+  it('should add unarmored-armor-class bonuses even with no armor', () => {
+    const data = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      modifiers: {
+        race: [],
+        class: [],
+        background: [],
+        item: [{ fixedValue: 2, id: 'm1', type: 'bonus', subType: 'unarmored-armor-class', value: null }],
+        feat: [],
+        condition: [],
+      },
+      inventory: [],
+    });
+    const ac = statDefinitions.ac.calculate(data);
+    expect(ac).toBe(14); // 10 + 2 + 2 (from unarmored-armor-class bonus)
+  });
+
+  it('should add armored-armor-class bonus when wearing armor', () => {
+    const data = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      modifiers: {
+        race: [],
+        class: [],
+        background: [],
+        item: [{ fixedValue: 1, id: 'm1', type: 'bonus', subType: 'armored-armor-class', value: null }],
+        feat: [],
+        condition: [],
+      },
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 200,
+            name: 'Leather Armor',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: 1, // This is armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+      ],
+    });
+    const ac = statDefinitions.ac.calculate(data);
+    expect(ac).toBe(13); // 10 + 2 + 1 (from armored-armor-class bonus)
+  });
+
+  it('should NOT add armored-armor-class bonus when not wearing armor', () => {
+    const data = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      modifiers: {
+        race: [],
+        class: [],
+        background: [],
+        item: [{ fixedValue: 1, id: 'm1', type: 'bonus', subType: 'armored-armor-class', value: null }],
+        feat: [],
+        condition: [],
+      },
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 300,
+            name: 'Bracers of Defense',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: true,
+            armorTypeId: null, // This is NOT armor
+          },
+          quantity: 1,
+          isAttuned: true,
+          equipped: true,
+        },
+      ],
+    });
+    const ac = statDefinitions.ac.calculate(data);
+    expect(ac).toBe(12); // 10 + 2 (NO armored-armor-class bonus since not wearing armor)
+  });
+
+  it('should handle AC override (characterValues typeId 1)', () => {
+    const data = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      characterValues: [
+        { typeId: 1, value: 20, notes: null, valueId: null, valueTypeId: null, contextId: null, contextTypeId: null },
+      ],
+    });
+    const ac = statDefinitions.ac.calculate(data);
+    expect(ac).toBe(20); // Overridden to 20, ignoring all calculations
+  });
+});
+
+describe('isWearingArmor', () => {
+  it('should return false with empty inventory', () => {
+    const data = createMockCharacterData({ inventory: [] });
+    expect(isWearingArmor(data)).toBe(false);
+  });
+
+  it('should return false with no inventory', () => {
+    const data = createMockCharacterData({ inventory: undefined });
+    expect(isWearingArmor(data)).toBe(false);
+  });
+
+  it('should return false with unequipped armor', () => {
+    const data = createMockCharacterData({
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 100,
+            name: 'Leather Armor',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: 1, // Is armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: false, // But not equipped
+        },
+      ],
+    });
+    expect(isWearingArmor(data)).toBe(false);
+  });
+
+  it('should return true with equipped armor', () => {
+    const data = createMockCharacterData({
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 100,
+            name: 'Plate Armor',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: 5, // Is armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+      ],
+    });
+    expect(isWearingArmor(data)).toBe(true);
+  });
+
+  it('should return false with Bracers of Defense (no armorTypeId)', () => {
+    const data = createMockCharacterData({
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 300,
+            name: 'Bracers of Defense',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: true,
+            armorTypeId: null, // Not armor
+          },
+          quantity: 1,
+          isAttuned: true,
+          equipped: true,
+        },
+      ],
+    });
+    expect(isWearingArmor(data)).toBe(false);
+  });
+
+  it('should return true with multiple items but only armor counts', () => {
+    const data = createMockCharacterData({
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 200,
+            name: 'Sword',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: null, // Not armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+        {
+          id: 2,
+          entityTypeId: 1,
+          definition: {
+            id: 201,
+            name: 'Shield',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: null, // Not armor (shields are separate)
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+        {
+          id: 3,
+          entityTypeId: 1,
+          definition: {
+            id: 202,
+            name: 'Chain Mail',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: 3, // IS armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+      ],
+    });
+    expect(isWearingArmor(data)).toBe(true);
+  });
+
+  it('should return false with equipped non-armor items', () => {
+    const data = createMockCharacterData({
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 200,
+            name: 'Sword',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: null,
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+        {
+          id: 2,
+          entityTypeId: 1,
+          definition: {
+            id: 201,
+            name: 'Ring of Protection',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: true,
+            armorTypeId: null,
+          },
+          quantity: 1,
+          isAttuned: true,
+          equipped: false,
+        },
+      ],
+    });
+    expect(isWearingArmor(data)).toBe(false);
+  });
+
+  it('should work with Defense fighting style: apply only when wearing armor', () => {
+    // Scenario 1: Unarmored with Bracers of Defense
+    const unarmoredData = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      modifiers: {
+        race: [],
+        class: [{ fixedValue: 1, id: 'defense-1', type: 'bonus', subType: 'armored-armor-class', value: null }],
+        background: [],
+        item: [{ fixedValue: 2, id: 'bracers-1', type: 'bonus', subType: 'unarmored-armor-class', value: null }],
+        feat: [],
+        condition: [],
+      },
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 300,
+            name: 'Bracers of Defense',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: true,
+            armorTypeId: null, // No armor
+          },
+          quantity: 1,
+          isAttuned: true,
+          equipped: true,
+        },
+      ],
+    });
+    const unarmoredAC = statDefinitions.ac.calculate(unarmoredData);
+    expect(unarmoredAC).toBe(14); // 10 + 2 + 2 (bracers), NOT the +1 defense bonus
+
+    // Scenario 2: Armored with Defense fighting style
+    const armoredData = createMockCharacterData({
+      stats: [
+        { id: 1, name: 'strength', value: 10 },
+        { id: 2, name: 'dexterity', value: 14 }, // +2 modifier
+      ],
+      modifiers: {
+        race: [],
+        class: [{ fixedValue: 1, id: 'defense-1', type: 'bonus', subType: 'armored-armor-class', value: null }],
+        background: [],
+        item: [],
+        feat: [],
+        condition: [],
+      },
+      inventory: [
+        {
+          id: 1,
+          entityTypeId: 1,
+          definition: {
+            id: 400,
+            name: 'Chain Mail',
+            isConsumable: false,
+            canEquip: true,
+            canAttune: false,
+            armorTypeId: 3, // Is armor
+          },
+          quantity: 1,
+          isAttuned: false,
+          equipped: true,
+        },
+      ],
+    });
+    const armoredAC = statDefinitions.ac.calculate(armoredData);
+    expect(armoredAC).toBe(13); // 10 + 2 + 1 (defense bonus), dex mod NOT added (armor sets its own AC)
   });
 });

@@ -22,7 +22,7 @@ export enum HpState {
 export interface StatEntry {
   id: number;
   name: string | null;
-  value: number;
+  value: number | null;
 }
 
 /**
@@ -89,6 +89,27 @@ export interface InventoryItem {
 }
 
 /**
+ * Choice entry from D&D Beyond API
+ */
+export interface Choice {
+  componentId: number;
+  componentTypeId: number | null;
+  id: string;
+  parentChoiceId: string | null;
+  type: number;
+  subType: number | null;
+  optionValue: number | null;
+  label: string | null;
+  isOptional: boolean;
+  isInfinite: boolean;
+  defaultSubtypes: unknown[];
+  displayOrder: number | null;
+  options: unknown[];
+  optionIds: number[];
+  [key: string]: unknown;
+}
+
+/**
  * Response from D&D Beyond character API
  */
 export interface DndBeyondCharacterResponse {
@@ -108,6 +129,13 @@ export interface DndBeyondCharacterResponse {
     item: Modifier[];
     feat: Modifier[];
     condition: Modifier[];
+  };
+  choices?: {
+    race: Choice[];
+    class: Choice[];
+    background: Choice[] | null;
+    item: Choice[] | null;
+    feat: Choice[];
   };
   deathSaves: {
     successes: number;

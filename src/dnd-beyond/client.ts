@@ -374,6 +374,20 @@ export class DndBeyondClient {
     * Parse D&D Beyond API response and extract raw character data
     */
    private parseRawResponse(responseBody: string): DndBeyondCharacterResponse {
+     // Only save API response if debug setting is enabled
+     if (this.saveApiResponse) {
+       try {
+         const responsePath = "api-response.json";
+         const prettyJson = JSON.stringify(JSON.parse(responseBody), null, 2);
+         fs.writeFileSync(responsePath, prettyJson);
+         console.log(`[DND] API response saved to ${responsePath}`);
+       } catch (error) {
+         console.warn(
+           `[DND] Failed to save API response: ${error instanceof Error ? error.message : String(error)}`
+         );
+       }
+     }
+
      let apiWrapper: { success?: boolean; data?: DndBeyondCharacterResponse };
      let parsedResponse: DndBeyondCharacterResponse;
 

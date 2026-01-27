@@ -7,6 +7,28 @@ import { DndBeyondCharacterResponse, Modifier } from "../types.js";
 import { StatDefinition, StatId } from "./types.js";
 
 /**
+ * Check if character is wearing armor (has equipped armor items)
+ * @param data Character data containing inventory
+ * @returns true if character has equipped armor
+ */
+function isWearingArmor(data: DndBeyondCharacterResponse): boolean {
+  if (!data.inventory) return false;
+
+  for (const item of data.inventory) {
+    // Check if item is equipped and is armor
+    if (item.equipped && item.definition) {
+      // Check if the item has an armorTypeId set (indicates it's armor)
+      const armorTypeId = (item.definition as Record<string, unknown>).armorTypeId;
+      if (armorTypeId !== null && armorTypeId !== undefined) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Get a Set of item definition IDs that are currently active (equipped/attuned and not consumable)
  * @param data Character data containing inventory
  * @returns Set of definition IDs for active items
@@ -50,6 +72,47 @@ function getActiveItemModifiers(data: DndBeyondCharacterResponse): Modifier[] {
 }
 
 /**
+ * Check if a modifier with isGranted=false should actually be granted
+ * based on resolved choices (for feats with ability score choices)
+ * @param data Character data containing choices
+ * @param modifier The modifier to check
+ * @returns true if the modifier should be granted based on choices
+ */
+function isModifierGrantedByChoice(
+  data: DndBeyondCharacterResponse,
+  modifier: Modifier
+): boolean {
+  // If already granted, no need to check choices
+  if (modifier.isGranted !== false) {
+    return true;
+  }
+
+  // Check feat choices
+  if (data.choices?.feat) {
+    for (const choice of data.choices.feat) {
+      // Choice id format is "{type}-{modifierId}" e.g. "2-62627511"
+      const parts = choice.id.split("-");
+      if (parts.length >= 2) {
+        const choiceModifierId = parts.slice(1).join("-"); // Handle ids with multiple hyphens
+
+        // Check if this choice references our modifier
+        if (choiceModifierId === modifier.id) {
+          // Check if a choice was made (optionValue is set and matches an optionId)
+          if (
+            choice.optionValue !== null &&
+            choice.optionIds.includes(choice.optionValue)
+          ) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Get all modifiers from all sources, filtering item modifiers to only active items
  * @param data Character data
  * @returns Array of all active modifiers
@@ -88,17 +151,17 @@ function getAbilityScore(
   }
 
   // Start with base stat
-  let score = data.stats[statIndex].value;
+  let score = data.stats[statIndex].value ?? 10;
 
-  // Add bonus stats
-  if (data.bonusStats[statIndex]?.value) {
-    score += data.bonusStats[statIndex].value;
-  }
+   // Add bonus stats
+   if (data.bonusStats[statIndex]?.value != null) {
+     score += data.bonusStats[statIndex].value;
+   }
 
-  // Override takes precedence
-  if (data.overrideStats[statIndex]?.value) {
-    return data.overrideStats[statIndex].value;
-  }
+   // Override takes precedence
+   if (data.overrideStats[statIndex]?.value != null) {
+     return data.overrideStats[statIndex].value;
+   }
 
   // Collect all modifiers
   const allModifiers = getAllModifiers(data);
@@ -108,7 +171,7 @@ function getAbilityScore(
     if (
       mod.type === "bonus" &&
       mod.subType === subType &&
-      mod.isGranted !== false
+      (mod.isGranted !== false || isModifierGrantedByChoice(data, mod))
     ) {
       const val = mod.fixedValue ?? mod.value;
       if (val !== null) {
@@ -123,7 +186,7 @@ function getAbilityScore(
     if (
       mod.type === "set" &&
       mod.subType === subType &&
-      mod.isGranted !== false
+      (mod.isGranted !== false || isModifierGrantedByChoice(data, mod))
     ) {
       const setValue = mod.fixedValue ?? mod.value;
       if (setValue !== null) {
@@ -275,46 +338,59 @@ const definitions: Record<StatId, StatDefinition> = {
     calculate: (data) => getTotalLevel(data.classes),
   },
 
-  ac: {
-    id: "ac",
-    name: "Armor Class",
-    description: "Armor class (10 + DEX mod + armor/shield bonuses)",
-    calculate: (data) => {
-      // Base AC is 10 + DEX modifier
-      const dexMod = getAbilityModifier(getAbilityScore(data, 1));
-      let ac = 10 + dexMod;
-
-      // Collect all modifiers (filtered to active items)
-      const allModifiers = getAllModifiers(data);
-
-      // Add AC bonuses from modifiers
-      for (const mod of allModifiers) {
-        if (
-          mod.type === "bonus" &&
-          (mod.subType === "armor-class" ||
-            mod.subType === "unarmored-armor-class" ||
-            mod.subType === "armored-armor-class") &&
-          mod.isGranted !== false
-        ) {
-          const val = mod.fixedValue ?? mod.value;
-          if (val !== null && typeof val === "number") {
-            ac += val;
+    ac: {
+      id: "ac",
+      name: "Armor Class",
+      description: "Armor class (10 + DEX mod + armor/shield bonuses)",
+      calculate: (data) => {
+        // Check for AC override from characterValues (typeId 1) - this SETS AC to a specific value
+        if (data.characterValues) {
+          for (const cv of data.characterValues) {
+            if (cv.typeId === 1 && typeof cv.value === "number") {
+              return cv.value; // Override - return this value directly, ignoring all calculations
+            }
           }
         }
-      }
 
-      // Add custom AC bonus from characterValues (typeId 3)
-      if (data.characterValues) {
-        for (const cv of data.characterValues) {
-          if (cv.typeId === 3 && typeof cv.value === "number") {
-            ac += cv.value;
-          }
-        }
-      }
+        // Base AC is 10 + DEX modifier
+        const dexMod = getAbilityModifier(getAbilityScore(data, 1));
+        let ac = 10 + dexMod;
 
-      return Math.max(10, ac); // Minimum 10
+        // Check if character is wearing armor (for armored-armor-class bonuses)
+        const wearingArmor = isWearingArmor(data);
+
+        // Collect all modifiers (filtered to active items)
+        const allModifiers = getAllModifiers(data);
+
+         // Add AC bonuses from modifiers
+         for (const mod of allModifiers) {
+           if (
+             mod.type === "bonus" &&
+             (mod.subType === "armor-class" ||
+               mod.subType === "unarmored-armor-class" ||
+               (mod.subType === "armored-armor-class" && wearingArmor)) &&
+             mod.isGranted !== false
+           ) {
+             const val = mod.fixedValue ?? mod.value;
+             if (val !== null && typeof val === "number") {
+               ac += val;
+             }
+           }
+         }
+
+         // Add custom AC bonus from characterValues (typeId 2 and typeId 3)
+         // D&D Beyond uses both typeIds for custom AC bonuses in the AC customization UI
+         if (data.characterValues) {
+           for (const cv of data.characterValues) {
+             if ((cv.typeId === 2 || cv.typeId === 3) && typeof cv.value === "number") {
+               ac += cv.value;
+             }
+           }
+         }
+
+        return Math.max(10, ac); // Minimum 10
+      },
     },
-  },
 
   hp_current: {
     id: "hp_current",
@@ -607,29 +683,20 @@ const definitions: Record<StatId, StatDefinition> = {
     },
   },
 
-  speed: {
-    id: "speed",
-    name: "Speed",
-    description: "Movement speed in feet (base 30 + modifiers)",
-    calculate: (data) => {
-      let speed = 30;
+   speed: {
+     id: "speed",
+     name: "Speed",
+     description: "Movement speed in feet (base 30 + modifiers)",
+     calculate: (data) => {
+       let speed = 30;
 
-      // Add speed modifiers
-      const speedBonus = sumModifiersByTypeAndSubType(data, "bonus", "speed");
-      speed += speedBonus;
+       // Add speed modifiers from modifiers
+       const speedBonus = sumModifiersByTypeAndSubType(data, "bonus", "speed");
+       speed += speedBonus;
 
-      // Add custom speed bonus from characterValues (typeId 2)
-      if (data.characterValues) {
-        for (const cv of data.characterValues) {
-          if (cv.typeId === 2 && typeof cv.value === "number") {
-            speed += cv.value;
-          }
-        }
-      }
-
-      return `${speed} ft.`;
-    },
-  },
+       return `${speed} ft.`;
+     },
+   },
 
   spell_save_dc: {
     id: "spell_save_dc",
@@ -666,6 +733,7 @@ export const statDefinitions: Record<StatId, StatDefinition> = definitions;
 
 // Export helpers for testing
 export {
+  isWearingArmor,
   getActiveItemIds,
   getActiveItemModifiers,
   getAllModifiers,
@@ -675,5 +743,6 @@ export {
   getTotalLevel,
   getProficiencyBonus,
   isProficientInSkill,
+  isModifierGrantedByChoice,
 };
 
