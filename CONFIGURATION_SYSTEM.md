@@ -111,11 +111,7 @@ The OBS D&D Beyond Automation app now features a modern, user-friendly JSON-base
 - Minimum value constraints
 - Dependency validation
 
-### ✅ Backward Compatibility
-- Existing Config type unchanged
-- All internal interfaces preserved
-- Supports legacy .env files
-- Drop-in replacement for loadConfig()
+
 
 ### ✅ Flexible Configuration
 - Supports all existing OBS modes (image_swap, visibility_toggle)
@@ -235,25 +231,6 @@ The implementation includes:
 - Conversion logic tests
 - All existing tests continue to pass
 
-## Backward Compatibility
-
-✅ Existing Config type is unchanged
-✅ OBSClientConfig interface preserved
-✅ All stat mapping functionality works
-✅ Game log support fully functional
-✅ .env files still work (legacy support)
-✅ loadConfig() still available in src/config.ts
-
-## Future Enhancements
-
-Potential improvements for future iterations:
-- Config file encryption for sensitive data
-- Multiple config profiles
-- Environment-specific config overrides
-- Configuration export/import
-- Config validation via CLI command
-- Auto-migration from .env to config.json
-
 ## Conclusion
 
-The new configuration system provides a modern, user-friendly experience while maintaining full backward compatibility with the existing codebase. The interactive setup wizard eliminates the need for users to manually edit configuration files, reducing errors and improving accessibility for non-technical streamers.
+The new configuration system provides a modern, user-friendly experience for D&D streamers. The interactive setup wizard eliminates the need for users to manually edit configuration files, reducing errors and improving accessibility.

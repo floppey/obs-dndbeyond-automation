@@ -61,7 +61,7 @@ obs-dndbeyond-automation/
 │   └── ... (all compiled files)
 ├── config.example.json           (example configuration)
 ├── README.md                     (user guide)
-├── CONFIGURATION_SYSTEM.md       (setup instructions)
+├── CONFIGURATION_SYSTEM.md       (detailed setup instructions)
 └── .gitignore
 ```
 
@@ -93,19 +93,35 @@ npm run build
    
    # Install dependencies
    npm install --production
-   
-   # Copy example config
-   copy config.example.json config.json
    ```
 
 3. **Configure:**
-   - Edit config.json with their D&D Beyond character ID and OBS WebSocket credentials
-   - See CONFIGURATION_SYSTEM.md for detailed instructions
+   - On first run, the interactive setup wizard will launch automatically
+   - Run: `npm start`
+   - The wizard will guide you through configuration
+   - Or manually edit `config.json` if you prefer
+   - See README.md for detailed instructions
 
 4. **Run:**
    ```bash
    npm start
    ```
+
+   Or use the development mode with auto-reload:
+   ```bash
+   npm run dev
+   ```
+
+3. **Configure:**
+    - On first run, the interactive setup wizard will launch automatically: `npm start`
+    - Or manually copy the example: `copy config.example.json config.json`
+    - Edit `config.json` with your D&D Beyond character ID and OBS WebSocket credentials
+    - See CONFIGURATION_SYSTEM.md for detailed instructions
+
+4. **Run:**
+    ```bash
+    npm start
+    ```
 
    Or use the development mode with auto-reload:
    ```bash
@@ -220,7 +236,7 @@ No special build needed - same ZIP works everywhere with Node.js!
 → User needs to install Node.js from nodejs.org
 
 ### "config.json not found"
-→ User should copy config.example.json to config.json in the same directory
+→ User should run `npm start` to trigger the interactive setup wizard, or manually copy config.example.json to config.json in the same directory
 
 ### "Cannot find module"
 → User should run `npm install --production` before running

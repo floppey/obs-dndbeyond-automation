@@ -111,39 +111,69 @@ file path       visibility
 
 ## 4. Configuration Requirements
 
-### Required Environment Variables
+### JSON Configuration Format
 
-| Variable | Type | Required | Default | Description |
-|----------|------|----------|---------|-------------|
-| `DND_CHARACTER_ID` | string | ✓ | - | Character ID from D&D Beyond URL |
-| `DND_COBALT_SESSION` | string | ✓ | - | Authentication cookie from D&D Beyond |
-| `OBS_WEBSOCKET_URL` | string | | `ws://localhost:4455` | OBS WebSocket endpoint |
-| `OBS_WEBSOCKET_PASSWORD` | string | | `` | OBS WebSocket password (if configured) |
-| `POLL_INTERVAL_MS` | number | | `5000` | Polling interval in milliseconds |
-| `OBS_MODE` | string | ✓ | - | Either `image_swap` or `visibility_toggle` |
-| `OBS_SCENE_NAME` | string | * | - | Scene name (required if mode is `visibility_toggle`) |
-| `OBS_SOURCE_NAME` | string | * | - | Source name (required if mode is `image_swap`) |
-| `OBS_IMAGE_HEALTHY` | string | * | - | Image path for healthy state (image_swap mode) |
-| `OBS_IMAGE_SCRATCHED` | string | * | - | Image path for scratched state (image_swap mode) |
-| `OBS_IMAGE_BLOODIED` | string | * | - | Image path for bloodied state (image_swap mode) |
-| `OBS_IMAGE_DYING` | string | * | - | Image path for dying state (image_swap mode) |
-| `OBS_IMAGE_UNCONSCIOUS` | string | * | - | Image path for unconscious state (image_swap mode) |
+The application uses `config.json` for all configuration:
 
-**Notes**:
-- Variables marked with `*` are conditionally required based on `OBS_MODE`
-- All image paths should use forward slashes or escaped backslashes (e.g., `C:/path/file.png`)
-- `DND_COBALT_SESSION` is sensitive - never commit `.env` to git
+```json
+{
+  "dndBeyond": {
+    "characterId": "123456789",
+    "cobaltSession": "your_token"
+  },
+  "obs": {
+    "websocketUrl": "ws://localhost:4455",
+    "websocketPassword": "optional_password",
+    "mode": "image_swap",
+    "sourceName": "Character_Portrait",
+    "images": {
+      "healthy": "C:/obs-images/healthy.png",
+      "scratched": "C:/obs-images/scratched.png",
+      "bloodied": "C:/obs-images/bloodied.png",
+      "dying": "C:/obs-images/dying.png",
+      "unconscious": "C:/obs-images/unconscious.png"
+    }
+  },
+  "polling": {
+    "intervalMs": 5000
+  },
+  "statMappings": [
+    { "statId": "ac", "obsSourceName": "Text_AC", "format": "AC: {value}" },
+    { "statId": "hp_display", "obsSourceName": "Text_HP" }
+  ],
+  "gameLog": {
+    "enabled": true,
+    "gameId": "your_campaign_id",
+    "userId": "your_user_id",
+    "pollIntervalMs": 3000,
+    "lastRoll": {
+      "sourceName": "Text_LastRoll",
+      "format": "{action}: {total}"
+    },
+    "rollHistory": {
+      "sourceName": "Text_RollHistory",
+      "format": "{action} {total}",
+      "count": 5
+    }
+  },
+  "debug": {
+    "saveApiResponse": false
+  }
+}
+```
 
 ### Obtaining D&D Beyond Credentials
 
 1. Log in to D&D Beyond
 2. Navigate to your character sheet
 3. Look at the URL: `https://www.dndbeyond.com/characters/{CHARACTER_ID}/...`
-4. In browser DevTools (F12):
+4. Note the CHARACTER_ID
+5. In browser DevTools (F12):
    - Network tab
    - Refresh page
    - Find request to `character-service.dndbeyond.com`
    - Copy `cobalt-session` cookie value from Request Headers
+   - Use this as `dndBeyond.cobaltSession`
 
 ---
 
@@ -157,31 +187,17 @@ file path       visibility
    npm install
    ```
 
-2. **Configure environment**:
+2. **First run - Interactive Setup**:
    ```bash
-   cp .env.example .env
-   # Edit .env with your credentials and paths
+   npm start
    ```
+   The interactive setup wizard will guide you through configuration and create `config.json`
 
-3. **For Image Swap Mode**:
-   ```env
-   OBS_MODE=image_swap
-   OBS_SOURCE_NAME=Character_Portrait
-   OBS_IMAGE_HEALTHY=C:/obs-images/healthy.png
-   OBS_IMAGE_SCRATCHED=C:/obs-images/scratched.png
-   OBS_IMAGE_BLOODIED=C:/obs-images/bloodied.png
-   OBS_IMAGE_DYING=C:/obs-images/dying.png
-   OBS_IMAGE_UNCONSCIOUS=C:/obs-images/unconscious.png
-   ```
+3. **Configure OBS**:
+   - For **Image Swap Mode**: Set up your OBS source and image paths
+   - For **Visibility Toggle Mode**: Create scene items named: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 
-4. **For Visibility Toggle Mode**:
-   ```env
-   OBS_MODE=visibility_toggle
-   OBS_SCENE_NAME=D&D Overlay
-   ```
-   Then in OBS, create scene items named: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
-
-5. **Start the application**:
+4. **Start the application**:
    ```bash
    npm start
    ```
@@ -191,11 +207,23 @@ file path       visibility
    npm run dev
    ```
 
-6. **Build for production**:
+5. **Build for production**:
    ```bash
    npm run build
    node dist/index.js
    ```
+
+### Manual Configuration Alternative
+
+If you prefer to manually edit configuration:
+
+```bash
+cp config.example.json config.json
+# Edit config.json with your settings
+npm start
+```
+
+See config.example.json for a complete example with all options.
 
 ### Output Example
 
@@ -363,7 +391,7 @@ obs-dndbeyond-automation/
 ├── PLAN.md                         # This file
 ├── package.json                    # Project metadata and dependencies
 ├── tsconfig.json                   # TypeScript compiler configuration
-├── .env.example                    # Environment variable template
+├── config.example.json             # Configuration template
 ├── .gitignore                      # Git exclusion rules
 ├── src/
 │   ├── index.ts                   # Main entry point and polling loop
@@ -391,4 +419,4 @@ This is a production-ready automation tool for D&D streaming that:
 - ✓ Provides clear logging for debugging
 - ✓ Type-safe throughout with full TypeScript coverage
 
-**Estimated Setup Time**: 10-15 minutes (get cookie, copy images, configure .env, npm install, npm start)
+**Estimated Setup Time**: 10-15 minutes (get credentials, run setup wizard, npm install, npm start)

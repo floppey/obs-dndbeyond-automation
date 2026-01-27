@@ -52,15 +52,9 @@ cp config.example.json config.json
 4. Find a request to `character-service.dndbeyond.com`
 5. In Request Headers, copy the `cobalt-session` cookie value
 
-### 4. Alternative: Use Environment Variables (Legacy)
 
-For backward compatibility, you can still use `.env` files:
-```bash
-cp .env.example .env
-# Edit .env with your D&D Beyond credentials and OBS settings
-```
 
-### 5. HP State Display Mode
+### 4. HP State Display Mode
 
 If using manual config.json, choose your HP display mode:
 
@@ -92,7 +86,7 @@ If using manual config.json, choose your HP display mode:
 ```
 Then create scene items in OBS with these exact names: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 
-### 6. (Optional) Configure Stat Display
+### 5. (Optional) Configure Stat Display
 
 Map any character stat to an OBS text source:
 ```json
@@ -107,14 +101,7 @@ Map any character stat to an OBS text source:
 }
 ```
 
-Or with environment variables (legacy):
-```env
-STAT_MAPPING_1=ac:Text_AC:AC {value}
-STAT_MAPPING_2=hp_display:Text_HP
-STAT_MAPPING_3=level:Text_Level:Lvl {value}
-```
-
-### 7. (Optional) Configure Dice Roll Display
+### 6. (Optional) Configure Dice Roll Display
 
 Display your dice rolls from D&D Beyond's game log:
 ```json
@@ -137,28 +124,11 @@ Display your dice rolls from D&D Beyond's game log:
 }
 ```
 
-Or with environment variables (legacy):
-```env
-# Enable game log polling
-GAME_LOG_ENABLED=true
-GAME_LOG_GAME_ID=your_campaign_id
-GAME_LOG_USER_ID=your_user_id
-
-# Last roll display (most recent roll)
-LAST_ROLL_SOURCE=Text_LastRoll
-LAST_ROLL_FORMAT={action}: {total}
-
-# Roll history (previous rolls, excluding the last roll)
-ROLL_HISTORY_SOURCE=Text_RollHistory
-ROLL_HISTORY_FORMAT={action} {total}
-ROLL_HISTORY_COUNT=5
-```
-
 **Finding your IDs:**
 - **Game ID**: Open your campaign, check Network tab for requests to `game-log-rest-live.dndbeyond.com`, find `gameId` parameter
 - **User ID**: Same request will show your `userId` parameter
 
-### 8. Start the Application
+### 7. Start the Application
 ```bash
 npm start
 ```
@@ -200,56 +170,7 @@ npm run dev
 
 ## Configuration
 
-### Environment Variables
-
-| Variable | Required | Default | Notes |
-|----------|----------|---------|-------|
-| `DND_CHARACTER_ID` | ✓ | - | From D&D Beyond URL |
-| `DND_COBALT_SESSION` | ✓ | - | From browser cookies (sensitive!) |
-| `OBS_WEBSOCKET_URL` | | `ws://localhost:4455` | OBS WebSocket endpoint |
-| `OBS_WEBSOCKET_PASSWORD` | | - | If password protected in OBS |
-| `OBS_MODE` | ✓ | - | `image_swap` or `visibility_toggle` |
-| `POLL_INTERVAL_MS` | | `5000` | Polling interval in ms (min: 3000) |
-| `STAT_MAPPING_*` | | - | See Stat Mapping section |
-| Mode-specific variables | * | - | See `.env.example` |
-
-## Stat Mapping Configuration
-
-### Overview
-
-Map any D&D Beyond character stat to an OBS text source for live overlay updates.
-
-**Format:**
-```
-STAT_MAPPING_<N>=<stat_id>:<obs_source_name>[:<format>]
-```
-
-- `<N>`: Sequential number (1, 2, 3, ...)
-- `<stat_id>`: The stat identifier (see list below)
-- `<obs_source_name>`: Exact name of the OBS text source
-- `<format>`: (Optional) Text format with `{value}` placeholder
-
-### Examples
-
-```env
-# Display AC value: "AC 15"
-STAT_MAPPING_1=ac:Text_AC:AC {value}
-
-# Display HP with auto-formatting: "72/125"
-STAT_MAPPING_2=hp_display:Text_HP
-
-# Display level: "Lvl 5"
-STAT_MAPPING_3=level:Text_Level:Lvl {value}
-
-# Display initiative with modifier sign: "+2"
-STAT_MAPPING_4=initiative:Text_Initiative:{value}
-
-# Display passive perception: "PP 16"
-STAT_MAPPING_5=passive_perception:Text_PP:PP {value}
-
-# Display spell save DC (no format - shows value directly)
-STAT_MAPPING_6=spell_save_dc:Text_SpellDC
-```
+The application uses `config.json` for all configuration. See the Quick Start section above for setup instructions.
 
 ### Available Stats
 
@@ -301,60 +222,7 @@ Display your D&D Beyond dice rolls in real-time on your OBS overlay. Requires yo
 
 ### Setup
 
-```env
-# Enable game log polling
-GAME_LOG_ENABLED=true
-
-# Your campaign/game ID (from D&D Beyond URL or Network tab)
-GAME_LOG_GAME_ID=1234567
-
-# Your D&D Beyond user ID (from Network tab)
-GAME_LOG_USER_ID=12345678
-
-# Poll interval in milliseconds (default: 3000)
-GAME_LOG_POLL_INTERVAL_MS=3000
-```
-
-### Last Roll Display
-
-Shows your most recent dice roll:
-
-```env
-# OBS text source name
-LAST_ROLL_SOURCE=Text_LastRoll
-
-# Format string with placeholders
-LAST_ROLL_FORMAT={action}: {total}
-```
-
-**Example outputs:**
-- `Persuasion: 21`
-- `Attack Roll: 18`
-- `Fireball: 32`
-
-### Roll History Display
-
-Shows previous rolls (excludes the most recent, which is shown in Last Roll):
-
-```env
-# OBS text source name
-ROLL_HISTORY_SOURCE=Text_RollHistory
-
-# Format for each line
-ROLL_HISTORY_FORMAT={action} {total}
-
-# Number of rolls to show
-ROLL_HISTORY_COUNT=5
-```
-
-**Example output:**
-```
-Perception 17
-Intimidation 21
-Persuasion 14
-Athletics 16
-Stealth 12
-```
+Configure the `gameLog` section in `config.json` (see example above in Quick Start section 6).
 
 ### Available Placeholders
 
@@ -372,9 +240,50 @@ Stealth 12
 ### Format Examples
 
 **Simple (just the result):**
-```env
-LAST_ROLL_FORMAT={action}: {total}
-# Output: "Persuasion: 21"
+```json
+"lastRoll": {
+  "sourceName": "Text_LastRoll",
+  "format": "{action}: {total}"
+}
+// Output: "Persuasion: 21"
+```
+
+**With advantage indicator:**
+```json
+"lastRoll": {
+  "sourceName": "Text_LastRoll",
+  "format": "{action}: {total} {roll_kind}"
+}
+// Output: "Persuasion: 21 advantage"
+```
+
+**Detailed breakdown:**
+```json
+"lastRoll": {
+  "sourceName": "Text_LastRoll",
+  "format": "{action} ({roll_type}): {breakdown} = {total}"
+}
+// Output: "Persuasion (check): (14,20)+1 = 21"
+```
+
+**Compact history:**
+```json
+"rollHistory": {
+  "sourceName": "Text_RollHistory",
+  "format": "{action} {total}",
+  "count": 5
+}
+// Output: "Perception 17"
+```
+
+**History with character name (for multi-character setups):**
+```json
+"rollHistory": {
+  "sourceName": "Text_RollHistory",
+  "format": "{character}: {action} {total}",
+  "count": 5
+}
+// Output: "Kan: Perception 17"
 ```
 
 **With advantage indicator:**
@@ -478,7 +387,7 @@ obs-dndbeyond-automation/
 ├── README.md                        # This file
 ├── package.json                    # Dependencies
 ├── tsconfig.json                   # TypeScript config
-├── .env.example                    # Configuration template
+├── config.example.json             # Configuration template
 ├── .gitignore                      # Git exclusions
 ├── src/
 │   ├── index.ts                   # Main entry point
@@ -505,46 +414,46 @@ obs-dndbeyond-automation/
 ## Troubleshooting
 
 ### "Cannot read character data"
-- Verify `DND_CHARACTER_ID` is correct (from URL)
-- Get a fresh `DND_COBALT_SESSION` cookie from browser DevTools
+- Verify `dndBeyond.characterId` is correct in `config.json` (from D&D Beyond URL)
+- Get a fresh `dndBeyond.cobaltSession` cookie from browser DevTools
 - Check internet connection
 - Try the manual test below
 
 ### "Failed to connect to OBS WebSocket"
 - Ensure OBS is running
 - Enable WebSocket Server: Tools → WebSocket Server Settings → Enable
-- Verify `OBS_WEBSOCKET_URL` matches OBS settings (usually `ws://localhost:4455`)
+- Verify `obs.websocketUrl` in `config.json` matches OBS settings (usually `ws://localhost:4455`)
 - Check firewall isn't blocking the connection
 
 ### "Scene item not found" (visibility_toggle mode)
 - Verify scene items are named exactly: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 - Names are case-sensitive
-- Ensure items exist in the scene specified by `OBS_SCENE_NAME`
+- Ensure items exist in the scene specified by `obs.sceneName` in `config.json`
 
 ### "Source not found" (image_swap mode)
-- Verify source name in `OBS_SOURCE_NAME` matches exactly (case-sensitive)
+- Verify source name in `obs.sourceName` matches exactly (case-sensitive)
 - Ensure the source exists in your OBS scene
 
 ### No OBS updates even though app runs
 - Take or heal damage on character sheet (app only updates on change)
-- Check OBS source/scene names match configuration exactly
-- Verify file paths are correct and use forward slashes (e.g., `C:/path/file.png`)
+- Check OBS source/scene names in `config.json` match your OBS setup exactly
+- Verify file paths in `obs.images` are correct and use forward slashes (e.g., `C:/path/file.png`)
 
 ### Stat values not updating
-- Verify `STAT_MAPPING_X` format is correct: `stat_id:obs_source_name:optional_format`
+- Verify `statMappings` format is correct in `config.json`
 - Check that OBS text sources exist and have exact names from config
 - Ensure stat IDs match the available stats list above
 - If using custom format, include `{value}` placeholder
 
 ### Dice rolls not appearing
-- Verify `GAME_LOG_ENABLED=true`
-- Check `GAME_LOG_GAME_ID` and `GAME_LOG_USER_ID` are correct
+- Verify `gameLog.enabled` is `true` in `config.json`
+- Check `gameLog.gameId` and `gameLog.userId` are correct
 - Ensure your character is in a campaign (game log requires campaign membership)
 - Make a roll on D&D Beyond and check console for `[GAME_LOG]` messages
 - Verify OBS text sources exist with exact names from config
 
 ### "Failed to fetch bearer token" error
-- Get a fresh `DND_COBALT_SESSION` cookie from browser DevTools
+- Get a fresh `dndBeyond.cobaltSession` cookie from browser DevTools
 - The cobalt session may have expired
 
 ## Development
@@ -575,8 +484,8 @@ obs-dndbeyond-automation/
 
 ## Security Notes
 
-- Never commit `.env` file to version control (`.gitignore` includes it)
-- `DND_COBALT_SESSION` is sensitive - treat like a password
+- Never commit `config.json` file to version control (`.gitignore` includes it)
+- `dndBeyond.cobaltSession` is sensitive - treat like a password
 - Use local OBS WebSocket when possible (avoid exposing to network)
 - If exposing to network, use strong password in OBS settings
 
@@ -591,7 +500,7 @@ curl -H "Cookie: cobalt-session=YOUR_COOKIE" \
 ### Testing OBS WebSocket connection
 ```bash
 # In OBS: Tools → WebSocket Server Settings → Copy Connection Info
-# Verify the URL and password are correct in your .env
+# Verify the URL and password are correct in your config.json
 ```
 
 ### Enable verbose logging
@@ -602,9 +511,13 @@ node dist/index.js
 ```
 
 ### Save API response for debugging
-In `.env`, set:
-```env
-DEBUG_SAVE_API_RESPONSE=true
+In `config.json`, set:
+```json
+{
+  "debug": {
+    "saveApiResponse": true
+  }
+}
 ```
 This will save the raw D&D Beyond API response to `api-response.json` on each poll (useful for debugging stat calculations). Note: This creates large files (~40KB per poll).
 
@@ -638,7 +551,7 @@ A: All roll types (checks, saves, attacks, damage, healing) are shown. Filtering
 
 For issues or questions:
 1. Check the Troubleshooting section above
-2. Verify configuration in `.env` matches your setup
+2. Verify configuration in `config.json` matches your setup
 3. Check OBS logs: Help → View Logs
 4. Review application output for specific error messages
 5. See `PLAN.md` for detailed architecture
