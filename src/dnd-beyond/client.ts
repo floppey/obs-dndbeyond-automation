@@ -126,7 +126,7 @@ export class DndBeyondClient {
    */
   private calculateConstitutionScore(data: DndBeyondCharacterResponse): number {
     // Start with base CON (id: 3)
-    let conScore = data.stats[2].value;
+    let conScore = data.stats[2].value ?? 10; // Default to 10 if null
 
     // Add bonus from bonusStats if present
     if (data.bonusStats[2].value !== null) {

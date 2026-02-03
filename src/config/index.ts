@@ -6,6 +6,7 @@
 import { Config, HpState } from "../types.js";
 import { StatMapping } from "../stats/types.js";
 import { GameLogConfig } from "../game-log/types.js";
+import { RuleEngineConfig } from "../rules/types.js";
 import { loadJsonConfig, saveJsonConfig, configExists } from "./loader.js";
 import { runSetupWizard } from "./setup.js";
 import { JsonConfig } from "./types.js";
@@ -100,6 +101,7 @@ function convertJsonConfigToConfig(jsonConfig: JsonConfig): Config {
     pollIntervalMs: jsonConfig.polling.intervalMs,
     statMappings,
     gameLog: gameLogConfig,
+    rules: jsonConfig.rules as RuleEngineConfig | undefined,
     debug: {
       saveApiResponse: jsonConfig.debug?.saveApiResponse || false,
     },

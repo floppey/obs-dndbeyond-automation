@@ -3,6 +3,10 @@
  * Visual Rule Editor with comprehensive form builder
  */
 
+// ============ CONFIGURATION STATE ============
+let appConfig = null; // Full application configuration
+
+
 // ============ CONDITION & ACTION SCHEMAS ============
 const CONDITION_SCHEMAS = {
   // HP conditions - comparison type
@@ -59,8 +63,10 @@ const toastContainer = document.getElementById("toastContainer");
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
   loadRules();
+  loadSettings();
   connectSSE();
   setupEventListeners();
+  setupTabNavigation();
 });
 
 // ============ RULE MANAGEMENT ============
@@ -75,6 +81,18 @@ async function loadRules() {
   } catch (error) {
     console.error("Failed to load rules:", error);
     showToast("Failed to load rules", "error");
+  }
+}
+
+// Load settings from server
+async function loadSettings() {
+  try {
+    const response = await fetch("/api/config");
+    appConfig = await response.json();
+    renderSettings();
+  } catch (error) {
+    console.error("Failed to load settings:", error);
+    showToast("Failed to load settings", "error");
   }
 }
 
@@ -278,14 +296,14 @@ function renderRule(rule, listIndex, ruleIndex) {
           <span class="rule-name">${escapeHtml(rule.name || rule.id)}</span>
           ${rule.priority ? `<span class="rule-priority">P: ${rule.priority}</span>` : ''}
         </div>
-        <div onclick="event.stopPropagation()">
-          <label class="toggle">
-            <input type="checkbox" ${rule.enabled !== false ? 'checked' : ''} onchange="toggleRuleEnabled(${listIndex}, ${ruleIndex}, this.checked)">
-            <span class="toggle-slider"></span>
-          </label>
-          <button class="btn btn-icon" onclick="openRuleEditor(${listIndex}, ${ruleIndex})" title="Edit rule">✏️</button>
-          <button class="btn btn-icon" onclick="deleteRule(${listIndex}, ${ruleIndex})" title="Delete rule">🗑️</button>
-        </div>
+         <div class="rule-controls" onclick="event.stopPropagation()">
+           <label class="toggle">
+             <input type="checkbox" ${rule.enabled !== false ? 'checked' : ''} onchange="toggleRuleEnabled(${listIndex}, ${ruleIndex}, this.checked)">
+             <span class="toggle-slider"></span>
+           </label>
+           <button class="btn btn-icon" onclick="openRuleEditor(${listIndex}, ${ruleIndex})" title="Edit rule">✏️</button>
+           <button class="btn btn-icon" onclick="deleteRule(${listIndex}, ${ruleIndex})" title="Delete rule">🗑️</button>
+         </div>
       </div>
       <div class="rule-body">
         <div class="rule-section">
@@ -612,7 +630,35 @@ function updateConditionType() {
 }
 
 function buildConditionFromEditor() {
-  const condType = document.getElementById("conditionType").value;
+  // Check if we're in group mode (AND/OR condition)
+  const groupOperatorEl = document.getElementById("groupOperator");
+  if (groupOperatorEl && editingRule.draft.condition?.conditions) {
+    // We're in group mode - preserve the group structure
+    // Update the operator from the dropdown
+    const operator = groupOperatorEl.value;
+    
+    // Build each nested condition from the group
+    const nestedConditions = [];
+    const conditionItems = document.querySelectorAll("#groupConditions .condition-item");
+    
+    conditionItems.forEach((item, index) => {
+      const existingCondition = editingRule.draft.condition.conditions[index];
+      if (existingCondition) {
+        nestedConditions.push(existingCondition);
+      }
+    });
+    
+    return {
+      operator: operator,
+      conditions: nestedConditions.length > 0 ? nestedConditions : editingRule.draft.condition.conditions
+    };
+  }
+  
+  // Single condition mode
+  const conditionTypeEl = document.getElementById("conditionType");
+  if (!conditionTypeEl) return null;
+  
+  const condType = conditionTypeEl.value;
   const schema = CONDITION_SCHEMAS[condType];
   
   if (!schema) return null;
@@ -674,11 +720,86 @@ function renderConditionGroup(groupCondition) {
 }
 
 function renderConditionGroupItem(condition, index) {
+  const schema = CONDITION_SCHEMAS[condition?.type] || CONDITION_SCHEMAS['always'];
+  
+  let fieldsHtml = '';
+  
+  // Render fields based on condition type
+  if (schema && schema.fields.length > 0) {
+    fieldsHtml = '<div class="condition-type-fields two-col" style="margin-top: 10px;">';
+    
+    for (const field of schema.fields) {
+      if (field === "operator") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Operator</label>
+            <select class="form-select" id="groupCondOp${index}" onchange="updateGroupConditionField(${index}, 'operator', this.value)">
+              <option value=">" ${condition?.operator === '>' ? 'selected' : ''}>Greater Than (>)</option>
+              <option value=">=" ${condition?.operator === '>=' ? 'selected' : ''}>Greater or Equal (>=)</option>
+              <option value="<" ${condition?.operator === '<' ? 'selected' : ''}>Less Than (<)</option>
+              <option value="<=" ${condition?.operator === '<=' ? 'selected' : ''}>Less or Equal (<=)</option>
+              <option value="==" ${condition?.operator === '==' ? 'selected' : ''}>Equal (==)</option>
+              <option value="!=" ${condition?.operator === '!=' ? 'selected' : ''}>Not Equal (!=)</option>
+            </select>
+          </div>
+        `;
+      } else if (field === "value") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Value</label>
+            <input type="number" class="form-input" id="groupCondVal${index}" value="${condition?.value || ''}" 
+                   onchange="updateGroupConditionField(${index}, 'value', parseInt(this.value))" placeholder="e.g., 50">
+          </div>
+        `;
+      } else if (field === "boolean") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Value</label>
+            <label class="toggle" style="margin-top: 8px;">
+              <input type="checkbox" id="groupCondBool${index}" ${condition?.value ? 'checked' : ''} 
+                     onchange="updateGroupConditionField(${index}, 'value', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        `;
+      } else if (field === "itemName") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Item Name</label>
+            <input type="text" class="form-input" id="groupCondItem${index}" value="${escapeHtml(condition?.itemName || '')}" 
+                   onchange="updateGroupConditionField(${index}, 'itemName', this.value)" placeholder="e.g., Croc form">
+          </div>
+        `;
+      } else if (field === "matchPartial") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Partial Match</label>
+            <label class="toggle" style="margin-top: 8px;">
+              <input type="checkbox" id="groupCondPartial${index}" ${condition?.matchPartial ? 'checked' : ''} 
+                     onchange="updateGroupConditionField(${index}, 'matchPartial', this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+        `;
+      } else if (field === "className") {
+        fieldsHtml += `
+          <div class="form-group">
+            <label>Class Name</label>
+            <input type="text" class="form-input" id="groupCondClass${index}" value="${escapeHtml(condition?.className || '')}" 
+                   onchange="updateGroupConditionField(${index}, 'className', this.value)" placeholder="e.g., Wizard">
+          </div>
+        `;
+      }
+    }
+    
+    fieldsHtml += '</div>';
+  }
+  
   return `
     <div class="condition-item nested" data-condition-index="${index}">
       <div class="form-group">
         <label>Condition Type</label>
-        <select class="form-select" onchange="updateGroupConditionType(${index})">
+        <select class="form-select" id="groupCondType${index}" onchange="updateGroupConditionType(${index}, this.value)">
           <optgroup label="HP">
             <option value="hp_percentage" ${condition?.type === 'hp_percentage' ? 'selected' : ''}>HP Percentage</option>
             <option value="hp_value" ${condition?.type === 'hp_value' ? 'selected' : ''}>HP Value</option>
@@ -691,9 +812,25 @@ function renderConditionGroupItem(condition, index) {
             <option value="death_saves_success" ${condition?.type === 'death_saves_success' ? 'selected' : ''}>Death Save Successes</option>
             <option value="death_saves_failure" ${condition?.type === 'death_saves_failure' ? 'selected' : ''}>Death Save Failures</option>
           </optgroup>
+          <optgroup label="Equipment">
+            <option value="item_equipped" ${condition?.type === 'item_equipped' ? 'selected' : ''}>Item Equipped</option>
+            <option value="item_attuned" ${condition?.type === 'item_attuned' ? 'selected' : ''}>Item Attuned</option>
+            <option value="armor_equipped" ${condition?.type === 'armor_equipped' ? 'selected' : ''}>Armor Equipped</option>
+            <option value="shield_equipped" ${condition?.type === 'shield_equipped' ? 'selected' : ''}>Shield Equipped</option>
+          </optgroup>
+          <optgroup label="Level">
+            <option value="level" ${condition?.type === 'level' ? 'selected' : ''}>Character Level</option>
+            <option value="class_level" ${condition?.type === 'class_level' ? 'selected' : ''}>Class Level</option>
+            <option value="has_class" ${condition?.type === 'has_class' ? 'selected' : ''}>Has Class</option>
+          </optgroup>
+          <optgroup label="Special">
+            <option value="always" ${condition?.type === 'always' ? 'selected' : ''}>Always</option>
+            <option value="never" ${condition?.type === 'never' ? 'selected' : ''}>Never</option>
+          </optgroup>
         </select>
       </div>
-      <div class="condition-controls">
+      ${fieldsHtml}
+      <div class="condition-controls" style="margin-top: 10px;">
         <button class="btn btn-danger btn-small" onclick="removeGroupCondition(${index})">Remove</button>
       </div>
     </div>
@@ -732,9 +869,33 @@ function removeGroupCondition(index) {
   }
 }
 
-function updateGroupConditionType(index) {
-  // Update logic for group conditions
-  renderConditionBuilder();
+function updateGroupConditionType(index, newType) {
+  if (editingRule.draft.condition && editingRule.draft.condition.conditions) {
+    // Create a new condition with the new type and default values
+    const schema = CONDITION_SCHEMAS[newType];
+    const newCondition = { type: newType };
+    
+    // Set default values based on schema
+    if (schema && schema.fields) {
+      for (const field of schema.fields) {
+        if (field === "operator") newCondition.operator = "<=";
+        if (field === "value") newCondition.value = 50;
+        if (field === "boolean") newCondition.value = true;
+        if (field === "itemName") newCondition.itemName = "";
+        if (field === "matchPartial") newCondition.matchPartial = false;
+        if (field === "className") newCondition.className = "";
+      }
+    }
+    
+    editingRule.draft.condition.conditions[index] = newCondition;
+    renderConditionBuilder();
+  }
+}
+
+function updateGroupConditionField(index, fieldName, value) {
+  if (editingRule.draft.condition && editingRule.draft.condition.conditions && editingRule.draft.condition.conditions[index]) {
+    editingRule.draft.condition.conditions[index][fieldName] = value;
+  }
 }
 
 function convertToSingleCondition() {
@@ -944,6 +1105,224 @@ function saveAdvancedJson() {
   } catch (e) {
     showToast("Invalid JSON: " + e.message, "error");
   }
+}
+
+// ============ SETTINGS MANAGEMENT ============
+
+// Render settings form from config
+function renderSettings() {
+  if (!appConfig) return;
+
+  // D&D Beyond
+  document.getElementById("dndCharacterId").value = appConfig.dndBeyond?.characterId || "";
+  const cobaltSession = appConfig.dndBeyond?.cobaltSession || "";
+  document.getElementById("dndCobaltSession").value = cobaltSession;
+  
+  // OBS Settings
+  document.getElementById("obsWebsocketUrl").value = appConfig.obs?.websocketUrl || "ws://localhost:4455";
+  document.getElementById("obsWebsocketPassword").value = appConfig.obs?.websocketPassword || "";
+  document.getElementById("obsMode").value = appConfig.obs?.mode || "image_swap";
+  document.getElementById("obsSceneName").value = appConfig.obs?.sceneName || "";
+  document.getElementById("obsSourceName").value = appConfig.obs?.sourceName || "";
+  
+  // Images
+  document.getElementById("imageHealthy").value = appConfig.obs?.images?.healthy || "";
+  document.getElementById("imageScratched").value = appConfig.obs?.images?.scratched || "";
+  document.getElementById("imageBloodied").value = appConfig.obs?.images?.bloodied || "";
+  document.getElementById("imageDying").value = appConfig.obs?.images?.dying || "";
+  document.getElementById("imageUnconscious").value = appConfig.obs?.images?.unconscious || "";
+  
+  // Polling
+  document.getElementById("pollingIntervalMs").value = appConfig.polling?.intervalMs || 5000;
+  
+  // Game Log
+  document.getElementById("gameLogEnabled").checked = appConfig.gameLog?.enabled || false;
+  document.getElementById("gameLogGameId").value = appConfig.gameLog?.gameId || "";
+  document.getElementById("gameLogUserId").value = appConfig.gameLog?.userId || "";
+  document.getElementById("gameLogPollIntervalMs").value = appConfig.gameLog?.pollIntervalMs || 5000;
+  document.getElementById("lastRollSourceName").value = appConfig.gameLog?.lastRoll?.sourceName || "";
+  document.getElementById("lastRollFormat").value = appConfig.gameLog?.lastRoll?.format || "";
+  document.getElementById("rollHistorySourceName").value = appConfig.gameLog?.rollHistory?.sourceName || "";
+  document.getElementById("rollHistoryFormat").value = appConfig.gameLog?.rollHistory?.format || "";
+  document.getElementById("rollHistoryCount").value = appConfig.gameLog?.rollHistory?.count || 5;
+  
+  // Debug
+  document.getElementById("debugSaveApiResponse").checked = appConfig.debug?.saveApiResponse || false;
+  
+  // Update conditional visibility
+  updateModeVisibility();
+  updateGameLogVisibility();
+}
+
+// Save settings to server
+async function saveSettings() {
+  try {
+    // Validate required fields
+    const characterId = document.getElementById("dndCharacterId").value.trim();
+    const cobaltSession = document.getElementById("dndCobaltSession").value.trim();
+    const websocketUrl = document.getElementById("obsWebsocketUrl").value.trim();
+    const sceneName = document.getElementById("obsSceneName").value.trim();
+    const sourceName = document.getElementById("obsSourceName").value.trim();
+    const pollingInterval = parseInt(document.getElementById("pollingIntervalMs").value);
+    
+    if (!characterId) {
+      showToast("Character ID is required", "error");
+      return;
+    }
+    if (!cobaltSession) {
+      showToast("Cobalt Session is required", "error");
+      return;
+    }
+    if (!websocketUrl) {
+      showToast("OBS WebSocket URL is required", "error");
+      return;
+    }
+    if (!sceneName) {
+      showToast("OBS Scene Name is required", "error");
+      return;
+    }
+    if (!sourceName) {
+      showToast("OBS Source Name is required", "error");
+      return;
+    }
+    if (pollingInterval < 1000) {
+      showToast("Polling interval must be at least 1000ms", "error");
+      return;
+    }
+    
+    // Build config object
+    const newConfig = {
+      dndBeyond: {
+        characterId,
+        cobaltSession,
+      },
+      obs: {
+        websocketUrl,
+        websocketPassword: document.getElementById("obsWebsocketPassword").value || "",
+        mode: document.getElementById("obsMode").value,
+        sceneName,
+        sourceName,
+        images: {
+          healthy: document.getElementById("imageHealthy").value || "",
+          scratched: document.getElementById("imageScratched").value || "",
+          bloodied: document.getElementById("imageBloodied").value || "",
+          dying: document.getElementById("imageDying").value || "",
+          unconscious: document.getElementById("imageUnconscious").value || "",
+        },
+      },
+      polling: {
+        intervalMs: pollingInterval,
+      },
+      gameLog: {
+        enabled: document.getElementById("gameLogEnabled").checked,
+        gameId: document.getElementById("gameLogGameId").value || "",
+        userId: document.getElementById("gameLogUserId").value || "",
+        pollIntervalMs: parseInt(document.getElementById("gameLogPollIntervalMs").value) || 5000,
+        lastRoll: {
+          sourceName: document.getElementById("lastRollSourceName").value || "",
+          format: document.getElementById("lastRollFormat").value || "",
+        },
+        rollHistory: {
+          sourceName: document.getElementById("rollHistorySourceName").value || "",
+          format: document.getElementById("rollHistoryFormat").value || "",
+          count: parseInt(document.getElementById("rollHistoryCount").value) || 5,
+        },
+      },
+      debug: {
+        saveApiResponse: document.getElementById("debugSaveApiResponse").checked,
+      },
+      // Keep existing rules
+      rules: appConfig.rules || { version: "1.0", ruleLists: [] },
+      // Preserve other config if it exists
+      ...Object.keys(appConfig).reduce((acc, key) => {
+        if (!["dndBeyond", "obs", "polling", "gameLog", "debug", "rules"].includes(key)) {
+          acc[key] = appConfig[key];
+        }
+        return acc;
+      }, {}),
+    };
+    
+    // Send to server
+    const response = await fetch("/api/config", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newConfig),
+    });
+    
+    const result = await response.json();
+    if (result.success) {
+      appConfig = newConfig;
+      showToast("Settings saved! Restart app for connection changes.", "success");
+      document.getElementById("settingsWarning").style.display = "block";
+    } else {
+      showToast(`Failed to save: ${result.error}`, "error");
+    }
+  } catch (error) {
+    console.error("Failed to save settings:", error);
+    showToast("Failed to save settings: " + error.message, "error");
+  }
+}
+
+// Update HP images visibility based on mode
+function updateModeVisibility() {
+  const mode = document.getElementById("obsMode").value;
+  const hpImagesSection = document.getElementById("hpImagesSection");
+  
+  if (mode === "image_swap") {
+    hpImagesSection.style.display = "block";
+  } else {
+    hpImagesSection.style.display = "none";
+  }
+}
+
+// Update game log fields visibility
+function updateGameLogVisibility() {
+  const enabled = document.getElementById("gameLogEnabled").checked;
+  const gameLogFields = document.getElementById("gameLogFields");
+  
+  if (enabled) {
+    gameLogFields.style.display = "block";
+  } else {
+    gameLogFields.style.display = "none";
+  }
+}
+
+// Toggle password visibility
+function togglePasswordVisibility(event) {
+  event.preventDefault();
+  const input = event.target.previousElementSibling;
+  if (input.type === "password") {
+    input.type = "text";
+    event.target.textContent = "🙈";
+  } else {
+    input.type = "password";
+    event.target.textContent = "👁️";
+  }
+}
+
+// ============ TAB NAVIGATION ============
+
+// Setup tab navigation
+function setupTabNavigation() {
+  const tabButtons = document.querySelectorAll(".tab-button");
+  const tabPanels = document.querySelectorAll(".tab-panel");
+  
+  tabButtons.forEach(button => {
+    button.addEventListener("click", () => {
+      const tabName = button.getAttribute("data-tab");
+      
+      // Deactivate all tabs and panels
+      tabButtons.forEach(b => b.classList.remove("active"));
+      tabPanels.forEach(p => p.classList.remove("active"));
+      
+      // Activate selected tab and panel
+      button.classList.add("active");
+      const panel = document.querySelector(`.tab-panel[data-panel="${tabName}"]`);
+      if (panel) {
+        panel.classList.add("active");
+      }
+    });
+  });
 }
 
 // ============ EVENT LISTENERS ============

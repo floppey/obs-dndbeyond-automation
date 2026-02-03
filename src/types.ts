@@ -4,6 +4,7 @@
 
 import { StatMapping } from "./stats/types.js";
 import { GameLogConfig } from "./game-log/types.js";
+import { RuleEngineConfig } from "./rules/types.js";
 
 /**
  * HP health states mapped from percentage
@@ -187,6 +188,7 @@ export interface Config {
   pollIntervalMs: number;
   statMappings: StatMapping[];
   gameLog?: GameLogConfig;
+  rules?: RuleEngineConfig;
   debug: {
     saveApiResponse: boolean;
   };
@@ -203,14 +205,15 @@ export interface IDndBeyondClient {
  * OBS WebSocket client interface
  */
 export interface IOBSClient {
-  connect(): Promise<void>;
-  disconnect(): Promise<void>;
-  isConnected(): boolean;
-  setImagePath(sourceName: string, imagePath: string): Promise<void>;
-  setSourceVisibility(
-    sceneName: string,
-    itemName: string,
-    visible: boolean
-  ): Promise<void>;
+   connect(): Promise<void>;
+   disconnect(): Promise<void>;
+   isConnected(): boolean;
+   setImagePath(sourceName: string, imagePath: string): Promise<void>;
+   setSourceVisibility(
+     sceneName: string,
+     itemName: string,
+     visible: boolean
+   ): Promise<void>;
+   setText(sourceName: string, text: string): Promise<void>;
 }
 

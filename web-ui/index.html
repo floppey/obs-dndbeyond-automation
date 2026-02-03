@@ -16,9 +16,17 @@
       </div>
     </header>
 
+    <!-- Tab Navigation -->
+    <nav class="tabs">
+      <button class="tab-button active" data-tab="character">📊 Character State</button>
+      <button class="tab-button" data-tab="rules">⚙️ Rules</button>
+      <button class="tab-button" data-tab="settings">⚡ Settings</button>
+      <button class="tab-button" data-tab="help">❓ Help</button>
+    </nav>
+
     <main class="main">
       <!-- Character State Panel -->
-      <section class="panel character-panel">
+      <section class="panel character-panel tab-panel active" data-panel="character">
         <h2>📊 Character State (Live)</h2>
         <div class="character-state" id="characterState">
           <div class="state-loading">Waiting for character data...</div>
@@ -26,7 +34,7 @@
       </section>
 
       <!-- Rules Configuration Panel -->
-      <section class="panel rules-panel">
+      <section class="panel rules-panel tab-panel" data-panel="rules">
         <div class="panel-header">
           <h2>⚙️ Rules Configuration</h2>
           <div class="panel-actions">
@@ -41,6 +49,845 @@
         </div>
         
         <button class="btn btn-add" id="addRuleListBtn">+ Add Rule List</button>
+      </section>
+
+      <!-- Settings Panel -->
+      <section class="panel settings-panel tab-panel" data-panel="settings">
+        <h2>⚡ Settings & Configuration</h2>
+        
+        <div class="settings-container">
+          <!-- D&D Beyond Section -->
+          <div class="settings-section">
+            <div class="settings-section-header">🎲 D&D Beyond Settings</div>
+            <div class="settings-section-content">
+              <div class="form-group">
+                <label for="dndCharacterId">Character ID *</label>
+                <input type="text" id="dndCharacterId" class="form-input" placeholder="e.g., 139364185">
+                <small class="form-hint">Your D&D Beyond character ID</small>
+              </div>
+              <div class="form-group">
+                <label for="dndCobaltSession">Cobalt Session Cookie *</label>
+                <div class="password-wrapper">
+                  <textarea id="dndCobaltSession" class="form-textarea" placeholder="Paste your cobaltSession cookie..." style="min-height: 80px;"></textarea>
+                  <small class="form-hint">Long authentication token from D&D Beyond (shows last 10 chars when saved)</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- OBS Connection Section -->
+          <div class="settings-section">
+            <div class="settings-section-header">📡 OBS Connection</div>
+            <div class="settings-section-content">
+              <div class="form-group">
+                <label for="obsWebsocketUrl">WebSocket URL *</label>
+                <input type="text" id="obsWebsocketUrl" class="form-input" placeholder="ws://localhost:4455" value="ws://localhost:4455">
+                <small class="form-hint">WebSocket endpoint for OBS (including ws:// or wss://)</small>
+              </div>
+              <div class="form-group">
+                <label for="obsWebsocketPassword">WebSocket Password</label>
+                <div class="password-wrapper">
+                  <input type="password" id="obsWebsocketPassword" class="form-input" placeholder="Leave empty if OBS has no password">
+                  <button class="btn btn-icon password-toggle" onclick="togglePasswordVisibility(event)" title="Show/hide">👁️</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="obsMode">Mode *</label>
+                <select id="obsMode" class="form-select" onchange="updateModeVisibility()">
+                  <option value="image_swap">Image Swap (change source image)</option>
+                  <option value="visibility_toggle">Visibility Toggle (show/hide source)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="obsSceneName">Scene Name *</label>
+                <input type="text" id="obsSceneName" class="form-input" placeholder="e.g., Oota">
+                <small class="form-hint">OBS scene containing your character display</small>
+              </div>
+              <div class="form-group" id="obsSourceNameGroup">
+                <label for="obsSourceName">Source Name *</label>
+                <input type="text" id="obsSourceName" class="form-input" placeholder="e.g., Character_Portrait">
+                <small class="form-hint">OBS source/item to update</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- HP State Images Section -->
+          <div class="settings-section" id="hpImagesSection" style="display: none;">
+            <div class="settings-section-header">🎨 HP State Images</div>
+            <div class="settings-section-content">
+              <small class="form-hint" style="display: block; margin-bottom: 12px;">Shown only when Mode = "Image Swap"</small>
+              <div class="form-group">
+                <label for="imageHealthy">Healthy Image Path</label>
+                <input type="text" id="imageHealthy" class="form-input" placeholder="e.g., E:/OBS/Kan_card_healthy.png">
+              </div>
+              <div class="form-group">
+                <label for="imageScratched">Scratched Image Path</label>
+                <input type="text" id="imageScratched" class="form-input" placeholder="HP > 50%">
+              </div>
+              <div class="form-group">
+                <label for="imageBloodied">Bloodied Image Path</label>
+                <input type="text" id="imageBloodied" class="form-input" placeholder="HP 25-50%">
+              </div>
+              <div class="form-group">
+                <label for="imageDying">Dying Image Path</label>
+                <input type="text" id="imageDying" class="form-input" placeholder="HP 10-25%">
+              </div>
+              <div class="form-group">
+                <label for="imageUnconscious">Unconscious Image Path</label>
+                <input type="text" id="imageUnconscious" class="form-input" placeholder="HP ≤ 0%">
+              </div>
+            </div>
+          </div>
+
+          <!-- Polling Section -->
+          <div class="settings-section">
+            <div class="settings-section-header">⏱️ Polling Settings</div>
+            <div class="settings-section-content">
+              <div class="form-group">
+                <label for="pollingIntervalMs">Character Polling Interval (ms) *</label>
+                <input type="number" id="pollingIntervalMs" class="form-input" min="1000" step="500" placeholder="5000">
+                <small class="form-hint">How often to check character data (minimum 1000ms)</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Game Log Section -->
+          <div class="settings-section">
+            <div class="settings-section-header">📜 Game Log (Rolls)</div>
+            <div class="settings-section-content">
+              <div class="form-group">
+                <label>Enabled</label>
+                <label class="toggle" style="margin-top: 8px;">
+                  <input type="checkbox" id="gameLogEnabled" onchange="updateGameLogVisibility()">
+                  <span class="toggle-slider"></span>
+                </label>
+                <small class="form-hint">Enable tracking of dice rolls from the game log</small>
+              </div>
+
+              <div id="gameLogFields" style="display: none;">
+                <div class="form-group">
+                  <label for="gameLogGameId">Game ID</label>
+                  <input type="text" id="gameLogGameId" class="form-input" placeholder="e.g., 5240583">
+                </div>
+                <div class="form-group">
+                  <label for="gameLogUserId">User ID</label>
+                  <input type="text" id="gameLogUserId" class="form-input" placeholder="e.g., 100800786">
+                </div>
+                <div class="form-group">
+                  <label for="gameLogPollIntervalMs">Poll Interval (ms)</label>
+                  <input type="number" id="gameLogPollIntervalMs" class="form-input" min="1000" step="500" placeholder="5000">
+                </div>
+
+                <!-- Last Roll -->
+                <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
+                  <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 12px; color: var(--accent);">Last Roll Display</div>
+                  <div class="form-group">
+                    <label for="lastRollSourceName">Source Name</label>
+                    <input type="text" id="lastRollSourceName" class="form-input" placeholder="e.g., Gamelog_Last_Roll">
+                  </div>
+                  <div class="form-group">
+                    <label for="lastRollFormat">Format String</label>
+                    <input type="text" id="lastRollFormat" class="form-input" placeholder="{action} {roll_type}: {total}">
+                    <small class="form-hint">Variables: {action}, {roll_type}, {total}, {breakdown}</small>
+                  </div>
+                </div>
+
+                <!-- Roll History -->
+                <div style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
+                  <div style="font-size: 0.9rem; font-weight: 500; margin-bottom: 12px; color: var(--accent);">Roll History Display</div>
+                  <div class="form-group">
+                    <label for="rollHistorySourceName">Source Name</label>
+                    <input type="text" id="rollHistorySourceName" class="form-input" placeholder="e.g., Gamelog_Roll_History">
+                  </div>
+                  <div class="form-group">
+                    <label for="rollHistoryFormat">Format String</label>
+                    <input type="text" id="rollHistoryFormat" class="form-input" placeholder="{action}: {total}">
+                    <small class="form-hint">Variables: {action}, {roll_type}, {total}</small>
+                  </div>
+                  <div class="form-group">
+                    <label for="rollHistoryCount">Number of Rolls to Show</label>
+                    <input type="number" id="rollHistoryCount" class="form-input" min="1" step="1" placeholder="5">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Debug Section -->
+          <div class="settings-section">
+            <div class="settings-section-header">🐛 Debug Options</div>
+            <div class="settings-section-content">
+              <div class="form-group">
+                <label>Save API Responses</label>
+                <label class="toggle" style="margin-top: 8px;">
+                  <input type="checkbox" id="debugSaveApiResponse">
+                  <span class="toggle-slider"></span>
+                </label>
+                <small class="form-hint">Save D&D Beyond API responses to disk for debugging</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- Save Button -->
+          <div class="settings-actions">
+            <div class="settings-warning" id="settingsWarning" style="display: none;">
+              ⚠️ Some changes require application restart to take effect (OBS/D&D Beyond connections)
+            </div>
+            <button class="btn btn-primary" id="saveSettingsBtn" onclick="saveSettings()">💾 Save Settings</button>
+          </div>
+        </div>
+       </section>
+
+      <!-- Help Panel -->
+      <section class="panel help-panel tab-panel" data-panel="help">
+        <h2>❓ Help & Documentation</h2>
+        
+        <div class="help-container">
+          <!-- Table of Contents (Sticky Sidebar) -->
+          <div class="help-toc">
+            <h3>Contents</h3>
+            <ul>
+              <li><a href="#help-overview">Overview</a></li>
+              <li><a href="#help-setup-ddb">D&D Beyond Setup</a></li>
+              <li><a href="#help-setup-obs">OBS Setup</a></li>
+              <li><a href="#help-rules">Rules Engine</a></li>
+              <li><a href="#help-conditions">Condition Types</a></li>
+              <li><a href="#help-actions">Action Types</a></li>
+              <li><a href="#help-examples">Examples</a></li>
+              <li><a href="#help-troubleshooting">Troubleshooting</a></li>
+            </ul>
+          </div>
+
+          <!-- Main Content Area -->
+          <div class="help-content">
+            <!-- OVERVIEW SECTION -->
+            <div class="help-section" id="help-overview">
+              <h3>Overview</h3>
+              <p>OBS D&D Beyond Automation is a tool that monitors your D&D Beyond character sheet in real-time and automatically updates your OBS scenes based on rules you define. It bridges the gap between your digital character data and your streaming setup.</p>
+              
+              <div class="help-tip">
+                <strong>How it works:</strong>
+                <ul>
+                  <li>The app polls your D&D Beyond character every few seconds</li>
+                  <li>Character data (HP, equipment, status) is compared against your rules</li>
+                  <li>When rule conditions match, corresponding OBS actions are triggered</li>
+                  <li>OBS updates are instant, providing immersive visual feedback to your stream</li>
+                </ul>
+              </div>
+
+              <p><strong>Key Features:</strong></p>
+              <ul>
+                <li><strong>📊 Character State:</strong> Live view of your character's HP, equipment, and status</li>
+                <li><strong>⚙️ Rules:</strong> Visual editor for creating automation rules</li>
+                <li><strong>⚡ Settings:</strong> Configuration for D&D Beyond and OBS connections</li>
+                <li><strong>❓ Help:</strong> This comprehensive documentation</li>
+              </ul>
+            </div>
+
+            <!-- D&D BEYOND SETUP SECTION -->
+            <div class="help-section" id="help-setup-ddb">
+              <h3>D&D Beyond Setup</h3>
+              <p>To connect to your D&D Beyond character, you need two pieces of information:</p>
+
+              <div class="help-subsection">
+                <h4>1. Character ID</h4>
+                <p>Your unique character identifier from D&D Beyond.</p>
+                <div class="help-tip">
+                  <strong>How to find it:</strong>
+                  <ol>
+                    <li>Go to your D&D Beyond character sheet (dndbeyond.com)</li>
+                    <li>Look at the URL in your browser's address bar</li>
+                    <li>The Character ID is the number at the end of the URL</li>
+                    <li>Example: <code class="help-code">dndbeyond.com/characters/139364185/Oota</code> → ID is <code class="help-code">139364185</code></li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>2. Cobalt Session Cookie</h4>
+                <p>An authentication token that allows the app to access your character data privately.</p>
+                <div class="help-tip">
+                  <strong>How to get it:</strong>
+                  <ol>
+                    <li>Open your browser's Developer Tools (<code class="help-code">F12</code> or Right-click → Inspect)</li>
+                    <li>Go to the <strong>Application</strong> tab (or <strong>Storage</strong> in Firefox)</li>
+                    <li>In the left sidebar, expand <strong>Cookies</strong></li>
+                    <li>Find <strong>dndbeyond.com</strong> and click it</li>
+                    <li>Look for the <code class="help-code">cobaltSession</code> cookie</li>
+                    <li>Copy the entire value (it's a long string)</li>
+                    <li>Paste it into the Cobalt Session field in Settings</li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="help-warning">
+                <strong>⚠️ Important:</strong> Your cobalt session cookie acts like a password. Keep it secret! The app shows only the last 10 characters when saved to help you verify it's correct.
+              </div>
+
+              <div class="help-warning">
+                <strong>⚠️ Session Expiry:</strong> Your cobalt session may expire periodically. If the app stops receiving character data, you'll need to get a new cookie and update Settings.
+              </div>
+            </div>
+
+            <!-- OBS SETUP SECTION -->
+            <div class="help-section" id="help-setup-obs">
+              <h3>OBS Setup</h3>
+              <p>Your OBS instance must have the WebSocket Server enabled for the app to communicate with it.</p>
+
+              <div class="help-subsection">
+                <h4>1. Enable WebSocket Server</h4>
+                <div class="help-tip">
+                  <ol>
+                    <li>Open OBS</li>
+                    <li>Go to <strong>Tools</strong> → <strong>WebSocket Server Settings</strong></li>
+                    <li>Check the box: <strong>Enable WebSocket Server</strong></li>
+                    <li>Note the <strong>Server Port</strong> (default: 4455)</li>
+                    <li>Optionally set a password for security</li>
+                    <li>Click <strong>Apply</strong> or <strong>OK</strong></li>
+                  </ol>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>2. Configure in Settings</h4>
+                <p>In the app's <strong>⚡ Settings</strong> tab, configure:</p>
+                <ul>
+                  <li><strong>WebSocket URL:</strong> Should be <code class="help-code">ws://localhost:4455</code> for local OBS</li>
+                  <li><strong>WebSocket Password:</strong> If you set one in OBS settings (leave empty if not)</li>
+                  <li><strong>Scene Name:</strong> The OBS scene containing your character display</li>
+                  <li><strong>Source Name:</strong> The specific OBS source/item to update</li>
+                </ul>
+              </div>
+
+              <div class="help-subsection">
+                <h4>3. Scene and Source Naming</h4>
+                <p>OBS organized content using Scenes and Sources. Understanding this structure is key:</p>
+                <ul>
+                  <li><strong>Scene:</strong> A collection of sources (e.g., "Combat", "Roleplay", "Dungeon")</li>
+                  <li><strong>Source:</strong> Individual elements like images, text, groups (e.g., "Character_Portrait", "HP_Bar")</li>
+                  <li>The app updates specific sources within specific scenes</li>
+                  <li>Source names must match exactly (case-sensitive)</li>
+                </ul>
+              </div>
+
+              <div class="help-tip">
+                <strong>To find source names in OBS:</strong>
+                <ol>
+                  <li>Navigate to the scene containing your target source</li>
+                  <li>Look in the <strong>Sources</strong> dock (usually bottom-left)</li>
+                  <li>Source names appear in the list exactly as configured</li>
+                </ol>
+              </div>
+            </div>
+
+            <!-- RULES ENGINE SECTION -->
+            <div class="help-section" id="help-rules">
+              <h3>Rules Engine</h3>
+              <p>Rules are the core of automation. They define "when something happens" (conditions) and "what to do about it" (actions).</p>
+
+              <div class="help-subsection">
+                <h4>Rule Anatomy</h4>
+                <pre class="help-pre">{
+  "name": "Show Bloodied Portrait",
+  "enabled": true,
+  "priority": 50,
+  "condition": { "type": "hp_percentage", "operator": "&lt;=", "value": 50 },
+  "actions": [
+    { "type": "set_image", "sourceName": "Portrait", "imagePath": "images/bloodied.png" }
+  ]
+}</pre>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Rule Lists and Modes</h4>
+                <p><strong>Rule Lists</strong> are groups of related rules that share a processing mode:</p>
+                <ul>
+                  <li><strong>first_match:</strong> Stops at the first rule that matches (useful for mutual exclusions)</li>
+                  <li><strong>all_matches:</strong> Runs all matching rules (useful for stacking effects)</li>
+                </ul>
+                <p><strong>Example:</strong> A portrait rule list with mode=first_match ensures only one portrait displays at a time.</p>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Priority</h4>
+                <p>Within a rule list, rules are evaluated in order of priority:</p>
+                <ul>
+                  <li>Higher numbers = evaluated first (0-100)</li>
+                  <li>Default priority is 0</li>
+                  <li>Use priority to ensure more specific conditions are checked first</li>
+                </ul>
+                <p><strong>Example:</strong> Check "is_dead" (priority 100) before "hp_percentage" (priority 50)</p>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Conditions</h4>
+                <p>Conditions check the character state. All must be true for a rule to execute (AND logic):</p>
+                <ul>
+                  <li><strong>Single conditions:</strong> Simple checks (HP &lt; 50%, has armor, etc.)</li>
+                  <li><strong>AND groups:</strong> All conditions must match</li>
+                  <li><strong>OR groups:</strong> Any condition can match</li>
+                  <li><strong>Complex combinations:</strong> Mix AND/OR groups for complex logic</li>
+                </ul>
+                <p><strong>Example:</strong> "If HP ≤ 50% AND character is not dead OR temporary HP &gt; 0"</p>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Actions</h4>
+                <p>Actions are executed when all conditions match:</p>
+                <ul>
+                  <li>Each rule can have multiple actions</li>
+                  <li>Actions execute in order</li>
+                  <li>Actions are only executed if conditions match</li>
+                </ul>
+              </div>
+
+              <div class="help-tip">
+                <strong>Rule Editor Tips:</strong>
+                <ul>
+                  <li>Use the visual editor for simple rules</li>
+                  <li>Use Advanced JSON editor for complex conditions</li>
+                  <li>Test rules by changing your character state in D&D Beyond</li>
+                  <li>Check OBS to confirm sources update correctly</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- CONDITIONS SECTION -->
+            <div class="help-section" id="help-conditions">
+              <h3>Condition Types Reference</h3>
+              <p>All 16 condition types with examples of when to use them:</p>
+
+              <table class="help-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Parameters</th>
+                    <th>Example</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>hp_percentage</code></td>
+                    <td>HP as % of max</td>
+                    <td>operator, value (0-100)</td>
+                    <td>&lt;= 50 → Bloodied</td>
+                  </tr>
+                  <tr>
+                    <td><code>hp_value</code></td>
+                    <td>Current HP amount</td>
+                    <td>operator, value</td>
+                    <td>&lt; 10 → Critical</td>
+                  </tr>
+                  <tr>
+                    <td><code>hp_temp</code></td>
+                    <td>Temporary HP</td>
+                    <td>operator, value</td>
+                    <td>&gt; 0 → Has temp HP</td>
+                  </tr>
+                  <tr>
+                    <td><code>hp_missing</code></td>
+                    <td>Damage taken (max - current)</td>
+                    <td>operator, value</td>
+                    <td>&gt; 20 → Significant damage</td>
+                  </tr>
+                  <tr>
+                    <td><code>is_dead</code></td>
+                    <td>Character is dead</td>
+                    <td>value (true/false)</td>
+                    <td>true → Show death overlay</td>
+                  </tr>
+                  <tr>
+                    <td><code>is_unconscious</code></td>
+                    <td>Character unconscious</td>
+                    <td>value (true/false)</td>
+                    <td>true → Show unconscious portrait</td>
+                  </tr>
+                  <tr>
+                    <td><code>death_saves_success</code></td>
+                    <td>Death save successes</td>
+                    <td>operator, value (0-3)</td>
+                    <td>== 3 → Stable</td>
+                  </tr>
+                  <tr>
+                    <td><code>death_saves_failure</code></td>
+                    <td>Death save failures</td>
+                    <td>operator, value (0-3)</td>
+                    <td>== 3 → Character dies</td>
+                  </tr>
+                  <tr>
+                    <td><code>item_equipped</code></td>
+                    <td>Item is equipped</td>
+                    <td>itemName, matchPartial</td>
+                    <td>Sword, partial=false → Has sword</td>
+                  </tr>
+                  <tr>
+                    <td><code>item_attuned</code></td>
+                    <td>Item is attuned</td>
+                    <td>itemName, matchPartial</td>
+                    <td>Ring, partial=true → Any ring attuned</td>
+                  </tr>
+                  <tr>
+                    <td><code>armor_equipped</code></td>
+                    <td>Any armor equipped</td>
+                    <td>value (true/false)</td>
+                    <td>true → In armor</td>
+                  </tr>
+                  <tr>
+                    <td><code>shield_equipped</code></td>
+                    <td>Shield equipped</td>
+                    <td>value (true/false)</td>
+                    <td>true → Has shield</td>
+                  </tr>
+                  <tr>
+                    <td><code>level</code></td>
+                    <td>Total character level</td>
+                    <td>operator, value</td>
+                    <td>&gt;= 10 → Double digits!</td>
+                  </tr>
+                  <tr>
+                    <td><code>class_level</code></td>
+                    <td>Specific class level</td>
+                    <td>className, operator, value</td>
+                    <td>Wizard >= 3 → 3rd level spells</td>
+                  </tr>
+                  <tr>
+                    <td><code>has_class</code></td>
+                    <td>Has specific class</td>
+                    <td>className, value (true/false)</td>
+                    <td>Barbarian, true → Is Barbarian</td>
+                  </tr>
+                  <tr>
+                    <td><code>always</code></td>
+                    <td>Always true (default)</td>
+                    <td>(none)</td>
+                    <td>No condition = always run</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="help-subsection">
+                <h4>Operators for Comparison Conditions</h4>
+                <p>For conditions with numeric values, use these operators:</p>
+                <ul>
+                  <li><code>&gt;</code> Greater than</li>
+                  <li><code>&gt;=</code> Greater or equal</li>
+                  <li><code>&lt;</code> Less than</li>
+                  <li><code>&lt;=</code> Less or equal</li>
+                  <li><code>==</code> Exactly equal</li>
+                  <li><code>!=</code> Not equal</li>
+                </ul>
+              </div>
+
+              <div class="help-tip">
+                <strong>Item Matching:</strong>
+                <ul>
+                  <li><strong>matchPartial = false:</strong> Item name must match exactly</li>
+                  <li><strong>matchPartial = true:</strong> Item name can be partial (searches for substring)</li>
+                  <li>Example: "Ring" with partial=true matches "Ring of Protection", "Magical Ring", etc.</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- ACTIONS SECTION -->
+            <div class="help-section" id="help-actions">
+              <h3>Action Types Reference</h3>
+              <p>Four types of actions that modify your OBS scene:</p>
+
+              <table class="help-table">
+                <thead>
+                  <tr>
+                    <th>Type</th>
+                    <th>Description</th>
+                    <th>Parameters</th>
+                    <th>Example</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>set_image</code></td>
+                    <td>Change image source</td>
+                    <td>sourceName, imagePath</td>
+                    <td>Portrait → images/bloodied.png</td>
+                  </tr>
+                  <tr>
+                    <td><code>set_visibility</code></td>
+                    <td>Show/hide scene item</td>
+                    <td>sceneName, itemName, visible</td>
+                    <td>Scene: Combat, Item: Dead_Overlay, visible: true</td>
+                  </tr>
+                  <tr>
+                    <td><code>set_text</code></td>
+                    <td>Set text content</td>
+                    <td>sourceName, text (supports variables)</td>
+                    <td>HP_Display → "HP: {currentHp}/{maxHp}"</td>
+                  </tr>
+                  <tr>
+                    <td><code>set_filter_visibility</code></td>
+                    <td>Enable/disable filter</td>
+                    <td>sourceName, filterName, visible</td>
+                    <td>Portrait + Red Tint filter → visible: true</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <div class="help-subsection">
+                <h4>Text Variables</h4>
+                <p>In <code>set_text</code> actions, you can use these variables in the text:</p>
+                <ul>
+                  <li><code>{currentHp}</code> Current HP value</li>
+                  <li><code>{maxHp}</code> Maximum HP</li>
+                  <li><code>{hpPercentage}</code> HP as percentage</li>
+                  <li><code>{tempHp}</code> Temporary HP</li>
+                  <li><code>{isDead}</code> true/false</li>
+                  <li><code>{isUnconscious}</code> true/false</li>
+                  <li><code>{level}</code> Total level</li>
+                  <li><code>{className}</code> Primary class name</li>
+                </ul>
+                <p><strong>Example:</strong> <code>"HP: {currentHp}/{maxHp} ({hpPercentage}%)"</code> → "HP: 28/50 (56%)"</p>
+              </div>
+
+              <div class="help-tip">
+                <strong>Action Tips:</strong>
+                <ul>
+                  <li>Image paths can be local files (e.g., <code>E:/OBS/portrait.png</code>) or URLs</li>
+                  <li>Source and scene names are case-sensitive</li>
+                  <li>Multiple actions execute in order</li>
+                  <li>Test each action individually before combining</li>
+                </ul>
+              </div>
+            </div>
+
+            <!-- EXAMPLES SECTION -->
+            <div class="help-section" id="help-examples">
+              <h3>Example Use Cases</h3>
+              <p>Common automation scenarios and how to set them up:</p>
+
+              <div class="help-subsection">
+                <h4>Example 1: HP-Based Portrait Switching</h4>
+                <p>Show different character portraits based on HP status (healthy → bloodied → dying → unconscious).</p>
+                <p><strong>Setup:</strong></p>
+                <ul>
+                  <li>Create a Rule List: "Portrait States"</li>
+                  <li>Mode: <strong>first_match</strong> (only one portrait at a time)</li>
+                </ul>
+                <pre class="help-pre">{
+  "name": "Portrait States",
+  "enabled": true,
+  "mode": "first_match",
+  "rules": [
+    {
+      "name": "Dead Portrait",
+      "priority": 100,
+      "condition": { "type": "is_dead", "value": true },
+      "actions": [{ "type": "set_image", "sourceName": "Portrait", "imagePath": "images/dead.png" }]
+    },
+    {
+      "name": "Unconscious Portrait",
+      "priority": 90,
+      "condition": { "type": "is_unconscious", "value": true },
+      "actions": [{ "type": "set_image", "sourceName": "Portrait", "imagePath": "images/unconscious.png" }]
+    },
+    {
+      "name": "Dying Portrait",
+      "priority": 80,
+      "condition": { "type": "hp_percentage", "operator": "&lt;=", "value": 25 },
+      "actions": [{ "type": "set_image", "sourceName": "Portrait", "imagePath": "images/dying.png" }]
+    },
+    {
+      "name": "Bloodied Portrait",
+      "priority": 70,
+      "condition": { "type": "hp_percentage", "operator": "&lt;=", "value": 50 },
+      "actions": [{ "type": "set_image", "sourceName": "Portrait", "imagePath": "images/bloodied.png" }]
+    },
+    {
+      "name": "Healthy Portrait",
+      "priority": 60,
+      "condition": { "type": "always" },
+      "actions": [{ "type": "set_image", "sourceName": "Portrait", "imagePath": "images/healthy.png" }]
+    }
+  ]
+}</pre>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Example 2: Equipment-Based Effects (Polymorph)</h4>
+                <p>Change character appearance based on equipped items (e.g., transforming via polymorph).</p>
+                <pre class="help-pre">{
+  "name": "Equipment Effects",
+  "enabled": true,
+  "mode": "first_match",
+  "rules": [
+    {
+      "name": "Crocodile Form",
+      "priority": 100,
+      "condition": { "type": "item_equipped", "itemName": "Polymorph Amulet", "matchPartial": true },
+      "actions": [
+        { "type": "set_image", "sourceName": "Portrait", "imagePath": "images/croc.png" },
+        { "type": "set_text", "sourceName": "StatusDisplay", "text": "CROCODILE FORM" }
+      ]
+    },
+    {
+      "name": "Normal Form",
+      "priority": 0,
+      "condition": { "type": "always" },
+      "actions": [
+        { "type": "set_image", "sourceName": "Portrait", "imagePath": "images/normal.png" },
+        { "type": "set_text", "sourceName": "StatusDisplay", "text": "Normal" }
+      ]
+    }
+  ]
+}</pre>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Example 3: Death Indicator Overlay</h4>
+                <p>Show/hide a death overlay when character dies.</p>
+                <pre class="help-pre">{
+  "name": "Death Overlay",
+  "enabled": true,
+  "mode": "all_matches",
+  "rules": [
+    {
+      "name": "Character Dead",
+      "priority": 100,
+      "condition": { "type": "is_dead", "value": true },
+      "actions": [
+        { "type": "set_visibility", "sceneName": "Combat", "itemName": "DeathOverlay", "visible": true }
+      ]
+    },
+    {
+      "name": "Character Alive",
+      "priority": 100,
+      "condition": { "type": "is_dead", "value": false },
+      "actions": [
+        { "type": "set_visibility", "sceneName": "Combat", "itemName": "DeathOverlay", "visible": false }
+      ]
+    }
+  ]
+}</pre>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Example 4: Live HP Display</h4>
+                <p>Update a text source with current HP and percentage.</p>
+                <pre class="help-pre">{
+  "name": "HP Display",
+  "enabled": true,
+  "mode": "all_matches",
+  "rules": [
+    {
+      "name": "Update HP Text",
+      "priority": 0,
+      "condition": { "type": "always" },
+      "actions": [
+        { "type": "set_text", "sourceName": "HP_Text", "text": "HP: {currentHp}/{maxHp} ({hpPercentage}%)" }
+      ]
+    }
+  ]
+}</pre>
+              </div>
+            </div>
+
+            <!-- TROUBLESHOOTING SECTION -->
+            <div class="help-section" id="help-troubleshooting">
+              <h3>Troubleshooting</h3>
+              <p>Solutions to common issues:</p>
+
+              <div class="help-subsection">
+                <h4>Connection Lost / App Won't Connect</h4>
+                <div class="help-warning">
+                  <p><strong>Problem:</strong> Status shows "Disconnected" or red dot</p>
+                  <p><strong>Solutions:</strong></p>
+                  <ul>
+                    <li>Check that the app is actually running (command line window open)</li>
+                    <li>Verify OBS is open and WebSocket Server is enabled</li>
+                    <li>Check the WebSocket URL in Settings matches your OBS setup</li>
+                    <li>If using a password, verify it's correct in Settings</li>
+                    <li>Try restarting both the app and OBS</li>
+                    <li>Check your firewall isn't blocking port 4455</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Character Data Not Loading</h4>
+                <div class="help-warning">
+                  <p><strong>Problem:</strong> Character State shows "Waiting for character data..."</p>
+                  <p><strong>Solutions:</strong></p>
+                  <ul>
+                    <li>Verify Character ID is correct (check in D&D Beyond URL)</li>
+                    <li>Get a fresh Cobalt Session cookie (old ones expire)</li>
+                    <li>Make sure the character sheet is public or you're logged into D&D Beyond</li>
+                    <li>Try changing something on your character sheet in D&D Beyond (take damage, equip item)</li>
+                    <li>Check network connection - the app needs internet access</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Rules Not Triggering</h4>
+                <div class="help-warning">
+                  <p><strong>Problem:</strong> OBS sources don't update when conditions should match</p>
+                  <p><strong>Solutions:</strong></p>
+                  <ul>
+                    <li>Verify the rule is <strong>enabled</strong> (toggle should be ON)</li>
+                    <li>Check the rule list is <strong>enabled</strong></li>
+                    <li>Verify the condition matches your current character state</li>
+                    <li>Check condition values (e.g., is HP actually &lt;= 50%?)</li>
+                    <li>Test the condition in Character State tab to see live values</li>
+                    <li>Try disabling and re-enabling the rule</li>
+                    <li>Temporarily change your character in D&D Beyond to trigger the condition</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>OBS Sources Not Updating</h4>
+                <div class="help-warning">
+                  <p><strong>Problem:</strong> Rules trigger but OBS doesn't change</p>
+                  <p><strong>Solutions:</strong></p>
+                  <ul>
+                    <li>Verify OBS WebSocket connection is active (green dot in app status)</li>
+                    <li>Check source names are spelled <strong>exactly</strong> (case-sensitive)</li>
+                    <li>Verify source exists in OBS at the location you specified</li>
+                    <li>For images, confirm the file path is correct (try full absolute path)</li>
+                    <li>Try updating the source manually in OBS to confirm it works</li>
+                    <li>Check OBS logs for WebSocket errors (Help → Log Files)</li>
+                    <li>Restart OBS and reconnect the app</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Performance Issues</h4>
+                <div class="help-warning">
+                  <p><strong>Problem:</strong> App is slow or unresponsive</p>
+                  <p><strong>Solutions:</strong></p>
+                  <ul>
+                    <li>Increase polling interval in Settings (default 5000ms is fine)</li>
+                    <li>Don't use complex OR groups with many conditions</li>
+                    <li>Keep rule lists focused - don't mix unrelated rules</li>
+                    <li>Close browser developer tools (they slow things down)</li>
+                    <li>Check system resource usage (CPU, memory)</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div class="help-subsection">
+                <h4>Getting More Help</h4>
+                <p><strong>Still stuck?</strong></p>
+                <ul>
+                  <li>Check Character State tab to see live character data</li>
+                  <li>Export your rules (Rules tab) and review the JSON</li>
+                  <li>Enable "Save API Responses" in Settings Debug section</li>
+                  <li>Check the command line window for error messages</li>
+                  <li>Review OBS logs and browser console (F12) for errors</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
     </main>
 

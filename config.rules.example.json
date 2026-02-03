@@ -1,0 +1,767 @@
+{
+  "version": "1.0",
+  "ruleLists": [
+    {
+      "id": "hp-portraits",
+      "name": "HP-Based Portrait Selection",
+      "enabled": true,
+      "mode": "first_match",
+      "rules": [
+        {
+          "id": "rule-portrait-dead",
+          "name": "Show dead portrait when character is dead",
+          "enabled": true,
+          "condition": {
+            "type": "is_dead",
+            "value": true
+          },
+          "actions": [
+            {
+              "type": "set_image",
+              "sourceName": "Character Portrait",
+              "imagePath": "C:/OBS-Assets/portraits/dead.png"
+            }
+          ],
+          "priority": 50
+        },
+        {
+          "id": "rule-portrait-critical",
+          "name": "Show critical HP portrait when below 25% HP",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": "<=",
+            "value": 25
+          },
+          "actions": [
+            {
+              "type": "set_image",
+              "sourceName": "Character Portrait",
+              "imagePath": "C:/OBS-Assets/portraits/critical.png"
+            }
+          ],
+          "priority": 40
+        },
+        {
+          "id": "rule-portrait-bloodied",
+          "name": "Show bloodied portrait when 26-50% HP",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": "<=",
+            "value": 50
+          },
+          "actions": [
+            {
+              "type": "set_image",
+              "sourceName": "Character Portrait",
+              "imagePath": "C:/OBS-Assets/portraits/bloodied.png"
+            }
+          ],
+          "priority": 30
+        },
+        {
+          "id": "rule-portrait-scratched",
+          "name": "Show scratched portrait when 51-75% HP",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": "<=",
+            "value": 75
+          },
+          "actions": [
+            {
+              "type": "set_image",
+              "sourceName": "Character Portrait",
+              "imagePath": "C:/OBS-Assets/portraits/scratched.png"
+            }
+          ],
+          "priority": 20
+        },
+        {
+          "id": "rule-portrait-healthy",
+          "name": "Show healthy portrait as default fallback",
+          "enabled": true,
+          "condition": {
+            "type": "always"
+          },
+          "actions": [
+            {
+              "type": "set_image",
+              "sourceName": "Character Portrait",
+              "imagePath": "C:/OBS-Assets/portraits/healthy.png"
+            }
+          ],
+          "priority": 0
+        }
+      ]
+    },
+    {
+      "id": "equipment-effects",
+      "name": "Equipment-Based Visual Effects",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-shield-visual",
+          "name": "Add shield aura when shield is equipped",
+          "enabled": true,
+          "condition": {
+            "type": "shield_equipped",
+            "value": true
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Shield Aura",
+              "visible": true
+            }
+          ],
+          "priority": 10
+        },
+        {
+          "id": "rule-armor-effect",
+          "name": "Show armor enhancement when heavy armor equipped",
+          "enabled": true,
+          "condition": {
+            "type": "item_equipped",
+            "itemName": "Plate",
+            "matchPartial": true
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Metallic Sheen",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-ring-of-protection",
+          "name": "Enable aura when Ring of Protection is attuned",
+          "enabled": true,
+          "condition": {
+            "type": "item_attuned",
+            "itemName": "Ring of Protection",
+            "matchPartial": false
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Protection Aura",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        }
+      ]
+    },
+    {
+      "id": "compound-conditions",
+      "name": "Compound Condition Examples (AND/OR Logic)",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-bloodied-unarmored",
+          "name": "Alert when bloodied AND has no armor",
+          "enabled": true,
+          "condition": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "type": "hp_percentage",
+                "operator": "<=",
+                "value": 50
+              },
+              {
+                "type": "armor_equipped",
+                "value": false
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Red Warning",
+              "visible": true
+            }
+          ],
+          "priority": 15
+        },
+        {
+          "id": "rule-low-hp-or-unconscious",
+          "name": "Show danger overlay when critically wounded OR unconscious",
+          "enabled": true,
+          "condition": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "type": "hp_percentage",
+                "operator": "<",
+                "value": 10
+              },
+              {
+                "type": "is_unconscious",
+                "value": true
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Critical Danger",
+              "visible": true
+            }
+          ],
+          "priority": 25
+        },
+        {
+          "id": "rule-healthy-and-protected",
+          "name": "Show confidence glow when healthy AND armored AND has shield",
+          "enabled": true,
+          "condition": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "type": "hp_percentage",
+                "operator": ">=",
+                "value": 75
+              },
+              {
+                "type": "armor_equipped",
+                "value": true
+              },
+              {
+                "type": "shield_equipped",
+                "value": true
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Confidence Glow",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-complex-nested",
+          "name": "Complex nested condition: (Low HP OR Missing Armor) AND Has Weapon",
+          "enabled": true,
+          "condition": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "operator": "OR",
+                "conditions": [
+                  {
+                    "type": "hp_percentage",
+                    "operator": "<",
+                    "value": 30
+                  },
+                  {
+                    "type": "armor_equipped",
+                    "value": false
+                  }
+                ]
+              },
+              {
+                "type": "item_equipped",
+                "itemName": "Sword",
+                "matchPartial": true
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Combat Ready",
+              "visible": true
+            }
+          ],
+          "priority": 12
+        }
+      ]
+    },
+    {
+      "id": "hp-text-display",
+      "name": "HP Text Display with Variable Interpolation",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-hp-text-healthy",
+          "name": "Show HP as green text when healthy",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": ">",
+            "value": 50
+          },
+          "actions": [
+            {
+              "type": "set_text",
+              "sourceName": "HP Text",
+              "text": "{currentHp}/{maxHp} HP"
+            },
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "HP Text",
+              "filterName": "Green Color",
+              "visible": true
+            }
+          ],
+          "priority": 10
+        },
+        {
+          "id": "rule-hp-text-wounded",
+          "name": "Show detailed HP info when wounded with percentage",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": "<=",
+            "value": 50
+          },
+          "actions": [
+            {
+              "type": "set_text",
+              "sourceName": "HP Text",
+              "text": "{currentHp}/{maxHp} ({hpPercentage}%)"
+            },
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "HP Text",
+              "filterName": "Yellow Color",
+              "visible": true
+            }
+          ],
+          "priority": 15
+        },
+        {
+          "id": "rule-hp-text-critical",
+          "name": "Show critical HP warning with percentage",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": "<=",
+            "value": 25
+          },
+          "actions": [
+            {
+              "type": "set_text",
+              "sourceName": "HP Text",
+              "text": "CRITICAL: {currentHp}/{maxHp} ({hpPercentage}%)"
+            },
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "HP Text",
+              "filterName": "Red Color",
+              "visible": true
+            }
+          ],
+          "priority": 20
+        },
+        {
+          "id": "rule-hp-text-with-temp",
+          "name": "Show temporary HP when present",
+          "enabled": true,
+          "condition": {
+            "type": "hp_temp",
+            "operator": ">",
+            "value": 0
+          },
+          "actions": [
+            {
+              "type": "set_text",
+              "sourceName": "HP Text",
+              "text": "{currentHp}/{maxHp} + {temporaryHp} TEMP"
+            }
+          ],
+          "priority": 25
+        }
+      ]
+    },
+    {
+      "id": "overlays",
+      "name": "Death and Unconscious Overlays",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-death-overlay",
+          "name": "Show death overlay when character is dead",
+          "enabled": true,
+          "condition": {
+            "type": "is_dead",
+            "value": true
+          },
+          "actions": [
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Death Overlay",
+              "visible": true
+            }
+          ],
+          "priority": 50
+        },
+        {
+          "id": "rule-unconscious-overlay",
+          "name": "Show unconscious overlay when HP is 0 or making death saves",
+          "enabled": true,
+          "condition": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "type": "hp_value",
+                "operator": "==",
+                "value": 0
+              },
+              {
+                "type": "death_saves_success",
+                "operator": ">",
+                "value": 0
+              },
+              {
+                "type": "death_saves_failure",
+                "operator": ">",
+                "value": 0
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Unconscious Overlay",
+              "visible": true
+            }
+          ],
+          "priority": 45
+        },
+        {
+          "id": "rule-hide-overlays",
+          "name": "Hide all status overlays when conscious and alive",
+          "enabled": true,
+          "condition": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "type": "is_dead",
+                "value": false
+              },
+              {
+                "type": "is_unconscious",
+                "value": false
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Death Overlay",
+              "visible": false
+            },
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Unconscious Overlay",
+              "visible": false
+            }
+          ],
+          "priority": 10
+        }
+      ]
+    },
+    {
+      "id": "death-saves-display",
+      "name": "Death Saves Counter Display",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-death-saves-text",
+          "name": "Display death save progress",
+          "enabled": true,
+          "condition": {
+            "operator": "OR",
+            "conditions": [
+              {
+                "type": "death_saves_success",
+                "operator": ">",
+                "value": 0
+              },
+              {
+                "type": "death_saves_failure",
+                "operator": ">",
+                "value": 0
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_text",
+              "sourceName": "Death Saves Display",
+              "text": "Death Saves: {deathSuccesses}✓ {deathFailures}✗"
+            },
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Death Saves Display",
+              "visible": true
+            }
+          ],
+          "priority": 20
+        },
+        {
+          "id": "rule-hide-death-saves-when-recovered",
+          "name": "Hide death saves display when character recovers",
+          "enabled": true,
+          "condition": {
+            "operator": "AND",
+            "conditions": [
+              {
+                "type": "is_dead",
+                "value": false
+              },
+              {
+                "type": "is_unconscious",
+                "value": false
+              }
+            ]
+          },
+          "actions": [
+            {
+              "type": "set_visibility",
+              "sceneName": "Gameplay",
+              "itemName": "Death Saves Display",
+              "visible": false
+            }
+          ],
+          "priority": 10
+        }
+      ]
+    },
+    {
+      "id": "ability-based-effects",
+      "name": "Ability Score and Modifier Effects",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-high-strength",
+          "name": "Show strength indicator when STR score >= 16",
+          "enabled": true,
+          "condition": {
+            "type": "ability_score",
+            "ability": "strength",
+            "operator": ">=",
+            "value": 16
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Strength Aura",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-wisdom-modifier",
+          "name": "Show wisdom bonus when wisdom modifier >= +3",
+          "enabled": true,
+          "condition": {
+            "type": "ability_modifier",
+            "ability": "wisdom",
+            "operator": ">=",
+            "value": 3
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Wisdom Glow",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-low-constitution",
+          "name": "Show fragility warning when CON < 10",
+          "enabled": true,
+          "condition": {
+            "type": "ability_score",
+            "ability": "constitution",
+            "operator": "<",
+            "value": 10
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Fragile Warning",
+              "visible": true
+            }
+          ],
+          "priority": 10
+        }
+      ]
+    },
+    {
+      "id": "level-based-effects",
+      "name": "Character Level and Class Level Rules",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-high-level",
+          "name": "Show experienced aura when level >= 10",
+          "enabled": true,
+          "condition": {
+            "type": "level",
+            "operator": ">=",
+            "value": 10
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Experience Glow",
+              "visible": true
+            }
+          ],
+          "priority": 3
+        },
+        {
+          "id": "rule-wizard-special",
+          "name": "Show spellcaster effects when has Wizard class",
+          "enabled": true,
+          "condition": {
+            "type": "has_class",
+            "className": "Wizard",
+            "value": true
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Arcane Aura",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-barbarian-rage-ready",
+          "name": "Show barbarian readiness when 3+ Barbarian levels",
+          "enabled": true,
+          "condition": {
+            "type": "class_level",
+            "className": "Barbarian",
+            "operator": ">=",
+            "value": 3
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Primal Rage",
+              "visible": true
+            }
+          ],
+          "priority": 5
+        }
+      ]
+    },
+    {
+      "id": "cleanup-filters",
+      "name": "Cleanup: Disable Filters Not Matched",
+      "enabled": true,
+      "mode": "all_matches",
+      "rules": [
+        {
+          "id": "rule-disable-shield-when-none",
+          "name": "Hide shield aura when no shield equipped",
+          "enabled": true,
+          "condition": {
+            "type": "shield_equipped",
+            "value": false
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Shield Aura",
+              "visible": false
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-disable-armor-effects",
+          "name": "Hide armor effects when no armor equipped",
+          "enabled": true,
+          "condition": {
+            "type": "armor_equipped",
+            "value": false
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Metallic Sheen",
+              "visible": false
+            }
+          ],
+          "priority": 5
+        },
+        {
+          "id": "rule-disable-warnings",
+          "name": "Hide warning filters when healthy",
+          "enabled": true,
+          "condition": {
+            "type": "hp_percentage",
+            "operator": ">",
+            "value": 50
+          },
+          "actions": [
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Red Warning",
+              "visible": false
+            },
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Critical Danger",
+              "visible": false
+            },
+            {
+              "type": "set_filter_visibility",
+              "sourceName": "Character Portrait",
+              "filterName": "Fragile Warning",
+              "visible": false
+            }
+          ],
+          "priority": 3
+        }
+      ]
+    }
+  ]
+}

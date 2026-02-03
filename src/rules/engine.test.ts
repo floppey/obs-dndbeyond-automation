@@ -1132,4 +1132,358 @@ describe('RuleEngine', () => {
       expect((actions[1] as any).sourceName).toBe('source2');
     });
   });
+
+  // ==========================================================================
+  // EQUIPMENT CONDITIONS
+  // ==========================================================================
+
+  describe('Equipment Conditions - item_equipped', () => {
+    it('should match when item is equipped (exact match)', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'Croc form', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+
+    it('should not match when item is not equipped', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'Croc form', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: false, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+
+    it('should match with partial item name when matchPartial is true', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'Croc', matchPartial: true }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+
+    it('should be case-insensitive', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'CROC FORM', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+
+    it('should not match when item does not exist in inventory', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'Croc form', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Longsword', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+
+    it('should return false when inventory is empty', () => {
+      const rule = createRule('rule-1', { type: 'item_equipped', itemName: 'Croc form', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+  });
+
+  describe('Equipment Conditions - item_attuned', () => {
+    it('should match when item is attuned', () => {
+      const rule = createRule('rule-1', { type: 'item_attuned', itemName: 'Ring of Protection', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: true, quantity: 1, definition: { id: 1, name: 'Ring of Protection', isConsumable: false, canEquip: true, canAttune: true } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+
+    it('should not match when item is not attuned', () => {
+      const rule = createRule('rule-1', { type: 'item_attuned', itemName: 'Ring of Protection', matchPartial: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Ring of Protection', isConsumable: false, canEquip: true, canAttune: true } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+  });
+
+  describe('Equipment Conditions - shield_equipped', () => {
+    it('should match when shield is equipped', () => {
+      const rule = createRule('rule-1', { type: 'shield_equipped', value: true }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Shield', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+
+    it('should not match when no shield is equipped', () => {
+      const rule = createRule('rule-1', { type: 'shield_equipped', value: true }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Longsword', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+
+    it('should match value: false when no shield equipped', () => {
+      const rule = createRule('rule-1', { type: 'shield_equipped', value: false }, [createMockAction('source')]);
+      const ruleList = createRuleList('list-1', 'all_matches', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Longsword', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+    });
+  });
+
+  // ==========================================================================
+  // COMBINED CONDITIONS (Real-world scenario like Croc form)
+  // ==========================================================================
+
+  describe('Real-world Scenario - Croc Form with HP', () => {
+    it('should match Croc form equipped AND HP <= 25%', () => {
+      const group: ConditionGroup = {
+        operator: 'AND',
+        conditions: [
+          { type: 'item_equipped', itemName: 'Croc form', matchPartial: false },
+          { type: 'hp_percentage', operator: '<=', value: 25 },
+        ],
+      };
+
+      const rule = createRule('croc-bloodied', group, [createMockAction('croc_bloodied')]);
+      const ruleList = createRuleList('portrait', 'first_match', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        hpPercentage: 20,
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+      expect((actions[0] as any).sourceName).toBe('croc_bloodied');
+    });
+
+    it('should NOT match when Croc form is not equipped even if HP matches', () => {
+      const group: ConditionGroup = {
+        operator: 'AND',
+        conditions: [
+          { type: 'item_equipped', itemName: 'Croc form', matchPartial: false },
+          { type: 'hp_percentage', operator: '<=', value: 25 },
+        ],
+      };
+
+      const rule = createRule('croc-bloodied', group, [createMockAction('croc_bloodied')]);
+      const ruleList = createRuleList('portrait', 'first_match', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        hpPercentage: 20,
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: false, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+
+    it('should NOT match when HP does not match even if Croc form equipped', () => {
+      const group: ConditionGroup = {
+        operator: 'AND',
+        conditions: [
+          { type: 'item_equipped', itemName: 'Croc form', matchPartial: false },
+          { type: 'hp_percentage', operator: '<=', value: 25 },
+        ],
+      };
+
+      const rule = createRule('croc-bloodied', group, [createMockAction('croc_bloodied')]);
+      const ruleList = createRuleList('portrait', 'first_match', [rule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        hpPercentage: 80,
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(0);
+    });
+
+    it('should fall through to normal HP rule when Croc form not equipped', () => {
+      const crocRule = createRule(
+        'croc-bloodied',
+        {
+          operator: 'AND',
+          conditions: [
+            { type: 'item_equipped', itemName: 'Croc form', matchPartial: false },
+            { type: 'hp_percentage', operator: '<=', value: 25 },
+          ],
+        },
+        [createMockAction('croc_bloodied')],
+        100
+      );
+
+      const normalRule = createRule(
+        'normal-bloodied',
+        { type: 'hp_percentage', operator: '<=', value: 25 },
+        [createMockAction('normal_bloodied')],
+        50
+      );
+
+      const ruleList = createRuleList('portrait', 'first_match', [crocRule, normalRule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        hpPercentage: 20,
+        character: createMockCharacter({
+          inventory: [], // No Croc form
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+      expect((actions[0] as any).sourceName).toBe('normal_bloodied');
+    });
+
+    it('should use Croc form rule when equipped (higher priority)', () => {
+      const crocRule = createRule(
+        'croc-bloodied',
+        {
+          operator: 'AND',
+          conditions: [
+            { type: 'item_equipped', itemName: 'Croc form', matchPartial: false },
+            { type: 'hp_percentage', operator: '<=', value: 25 },
+          ],
+        },
+        [createMockAction('croc_bloodied')],
+        100
+      );
+
+      const normalRule = createRule(
+        'normal-bloodied',
+        { type: 'hp_percentage', operator: '<=', value: 25 },
+        [createMockAction('normal_bloodied')],
+        50
+      );
+
+      const ruleList = createRuleList('portrait', 'first_match', [crocRule, normalRule]);
+      const config = createConfig([ruleList]);
+      const context = createContext({
+        hpPercentage: 20,
+        character: createMockCharacter({
+          inventory: [
+            { id: 1, entityTypeId: 1, equipped: true, isAttuned: false, quantity: 1, definition: { id: 1, name: 'Croc form', isConsumable: false, canEquip: true, canAttune: false } },
+          ],
+        }),
+      });
+
+      const actions = engine.evaluate(config, context);
+
+      expect(actions).toHaveLength(1);
+      expect((actions[0] as any).sourceName).toBe('croc_bloodied');
+    });
+  });
 });

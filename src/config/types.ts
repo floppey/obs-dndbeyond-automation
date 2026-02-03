@@ -86,6 +86,27 @@ export interface JsonConfigDebug {
 }
 
 /**
+ * Rules engine configuration
+ */
+export interface JsonConfigRules {
+  version: string;
+  ruleLists: Array<{
+    id: string;
+    name: string;
+    enabled?: boolean;
+    mode: "first_match" | "all_matches";
+    rules: Array<{
+      id: string;
+      name?: string;
+      enabled?: boolean;
+      condition: unknown; // Complex nested type, validated at runtime
+      actions: unknown[]; // Complex type, validated at runtime
+      priority?: number;
+    }>;
+  }>;
+}
+
+/**
  * Complete JSON configuration structure
  */
 export interface JsonConfig {
@@ -95,4 +116,5 @@ export interface JsonConfig {
   statMappings?: JsonConfigStatMapping[];
   gameLog?: JsonConfigGameLog;
   debug?: JsonConfigDebug;
+  rules?: JsonConfigRules;
 }
