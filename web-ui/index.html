@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OBS D&D Beyond - Rules Configuration</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>🎲 OBS D&D Beyond Automation</h1>
+      <div class="connection-status" id="connectionStatus">
+        <span class="status-dot"></span>
+        <span class="status-text">Connecting...</span>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Character State Panel -->
+      <section class="panel character-panel">
+        <h2>📊 Character State (Live)</h2>
+        <div class="character-state" id="characterState">
+          <div class="state-loading">Waiting for character data...</div>
+        </div>
+      </section>
+
+      <!-- Rules Configuration Panel -->
+      <section class="panel rules-panel">
+        <div class="panel-header">
+          <h2>⚙️ Rules Configuration</h2>
+          <div class="panel-actions">
+            <button class="btn btn-secondary" id="importBtn">Import JSON</button>
+            <button class="btn btn-secondary" id="exportBtn">Export JSON</button>
+            <button class="btn btn-primary" id="saveBtn">💾 Save Rules</button>
+          </div>
+        </div>
+        
+        <div class="rules-editor" id="rulesEditor">
+          <!-- Rule lists will be rendered here -->
+        </div>
+        
+        <button class="btn btn-add" id="addRuleListBtn">+ Add Rule List</button>
+      </section>
+    </main>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Modal for JSON import -->
+    <div class="modal" id="importModal">
+      <div class="modal-content">
+        <h3>Import Rules JSON</h3>
+        <textarea id="importTextarea" placeholder="Paste your rules JSON here..."></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="cancelImportBtn">Cancel</button>
+          <button class="btn btn-primary" id="confirmImportBtn">Import</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for JSON export -->
+    <div class="modal" id="exportModal">
+      <div class="modal-content">
+        <h3>Export Rules JSON</h3>
+        <textarea id="exportTextarea" readonly></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="closeExportBtn">Close</button>
+          <button class="btn btn-primary" id="copyExportBtn">📋 Copy to Clipboard</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Visual Rule Editor -->
+    <div class="modal" id="ruleEditorModal">
+      <div class="modal-content modal-content-large">
+        <div class="modal-header">
+          <h3>Edit Rule</h3>
+          <button class="btn btn-icon modal-close-btn" onclick="closeRuleEditor()">✕</button>
+        </div>
+        
+        <div class="rule-editor-content">
+          <!-- Basic Info Section -->
+          <div class="editor-section">
+            <div class="section-title">📋 Basic Information</div>
+            <div class="form-group">
+              <label for="ruleEditorName">Rule Name *</label>
+              <input type="text" id="ruleEditorName" class="form-input" placeholder="e.g., Show HP indicator">
+              <small class="form-hint">A descriptive name for this rule</small>
+            </div>
+            
+            <div class="form-row">
+              <div class="form-group" style="flex: 1;">
+                <label for="ruleEditorPriority">Priority</label>
+                <input type="number" id="ruleEditorPriority" class="form-input" min="0" max="100" value="0">
+                <small class="form-hint">0 = lowest, 100 = highest</small>
+              </div>
+              <div class="form-group" style="flex: 1;">
+                <label for="ruleEditorEnabled">Enabled</label>
+                <label class="toggle" style="margin-top: 8px;">
+                  <input type="checkbox" id="ruleEditorEnabled" checked>
+                  <span class="toggle-slider"></span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <!-- Condition Builder Section -->
+          <div class="editor-section">
+            <div class="section-title">⚙️ Condition Builder</div>
+            <div id="conditionBuilder">
+              <!-- Conditions will be rendered here -->
+            </div>
+            <button class="btn btn-secondary btn-small" id="addConditionBtn" onclick="addConditionToEditor()">+ Add Condition</button>
+          </div>
+
+          <!-- Actions Builder Section -->
+          <div class="editor-section">
+            <div class="section-title">🎬 Actions</div>
+            <div id="actionBuilder">
+              <!-- Actions will be rendered here -->
+            </div>
+            <button class="btn btn-secondary btn-small" id="addActionBtn" onclick="addActionToEditor()">+ Add Action</button>
+          </div>
+
+          <!-- Modal Footer -->
+          <div class="modal-actions modal-actions-fixed">
+            <button class="btn btn-secondary" onclick="closeRuleEditor()">Cancel</button>
+            <button class="btn btn-secondary" id="advancedJsonBtn" onclick="openAdvancedJsonEditor()">Advanced JSON</button>
+            <button class="btn btn-primary" onclick="saveRuleFromEditor()">Save Rule</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal for Advanced JSON Editor -->
+    <div class="modal" id="advancedJsonModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Advanced JSON Editor</h3>
+          <button class="btn btn-icon modal-close-btn" onclick="closeAdvancedJsonEditor()">✕</button>
+        </div>
+        <textarea id="advancedJsonTextarea" class="advanced-json-textarea" placeholder="Edit rule JSON..."></textarea>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeAdvancedJsonEditor()">Cancel</button>
+          <button class="btn btn-primary" onclick="saveAdvancedJson()">Save JSON</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
