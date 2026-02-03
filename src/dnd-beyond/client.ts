@@ -271,24 +271,28 @@ export class DndBeyondClient {
     return total;
   }
 
-  /**
-   * Calculate max HP based on D&D Beyond rules
-   */
-  private calculateMaxHp(data: DndBeyondCharacterResponse): number {
-    // If override is set, use it
-    if (data.overrideHitPoints !== null) {
-      return data.overrideHitPoints;
-    }
+   /**
+    * Calculate max HP based on D&D Beyond rules
+    */
+   private calculateMaxHp(data: DndBeyondCharacterResponse): number {
+     // If override is set, use it
+     if (data.overrideHitPoints !== null) {
+       return data.overrideHitPoints;
+     }
 
-    // Calculate: base + (CON modifier × total level) + HP bonuses
-    const conScore = this.calculateConstitutionScore(data);
-    const conModifier = this.calculateConstitutionModifier(conScore);
-    const totalLevel = this.getTotalLevel(data.classes);
-    const hpBonus = this.getHpBonusModifiers(data);
+     // Calculate: base + (CON modifier × total level) + HP bonuses + manual bonus
+     const conScore = this.calculateConstitutionScore(data);
+     const conModifier = this.calculateConstitutionModifier(conScore);
+     const totalLevel = this.getTotalLevel(data.classes);
+     const hpBonus = this.getHpBonusModifiers(data);
+     const bonusHp = data.bonusHitPoints || 0;
 
-    const maxHp = data.baseHitPoints + conModifier * totalLevel + hpBonus;
-    return Math.max(0, maxHp);
-  }
+     const maxHp = data.baseHitPoints + conModifier * totalLevel + hpBonus + bonusHp;
+     
+     console.log(`[DND] HP Calculation: base=${data.baseHitPoints} + (CON mod ${conModifier} × level ${totalLevel}) + bonuses=${hpBonus} + manual=${bonusHp} = ${maxHp}`);
+     
+     return Math.max(0, maxHp);
+   }
 
     /**
      * Parse D&D Beyond API response and extract HP data
