@@ -4,7 +4,7 @@
  */
 
 import { logConfig } from "./config.js";
-import { loadOrCreateConfig } from "./config/index.js";
+import { loadOrCreateConfig, ConfigLoadResult } from "./config/index.js";
 import { DndBeyondClient } from "./dnd-beyond/client.js";
 import { formatHpInfo } from "./dnd-beyond/hp-calculator.js";
 import { OBSClient } from "./obs/client.js";
@@ -79,57 +79,49 @@ class OBSDndBeyondAutomation {
     * Start the automation
     */
    async start(): Promise<void> {
+     console.log("[APP] Initializing OBS D&D Beyond HP Swapper...");
+
+     // Start web UI server FIRST so config UI is always accessible
      try {
-       console.log("[APP] Initializing OBS D&D Beyond HP Swapper...");
-
-        // Connect to OBS
-        await this.obsClient.connect();
-
-        // Start web UI server
-        try {
-          await this.webServer.start(3000);
-        } catch (error) {
-          console.warn(`[APP] Failed to start web UI: ${error instanceof Error ? error.message : String(error)}`);
-          // Don't fail startup if web UI fails - it's optional
-        }
-
-        // Start character polling loop
-       console.log(
-         `[APP] Starting character polling loop (interval: ${this.pollIntervalMs}ms)...`
-       );
-       await this.poll();
-
-        // Schedule subsequent character polls
-        this.pollHandle = setInterval(() => {
-          this.poll().catch((error) => {
-            console.error(`[APP] Poll error: ${error instanceof Error ? error.message : String(error)}`);
-            this.shutdown("POLL_ERROR");
-          });
-        }, this.pollIntervalMs);
-
-        // Start game log polling if configured
-        if (this.gameLogClient && this.config.gameLog) {
-          console.log(
-            `[APP] Starting game log polling (interval: ${this.config.gameLog.pollIntervalMs}ms)...`
-          );
-          await this.pollGameLog();
-
-          this.gameLogPollHandle = setInterval(() => {
-            this.pollGameLog().catch((error) => {
-              console.error(`[APP] Game log poll error: ${error instanceof Error ? error.message : String(error)}`);
-              // Don't shutdown on game log errors - they're less critical
-            });
-          }, this.config.gameLog.pollIntervalMs);
-        }
-
-       console.log("[APP] ✓ Automation started successfully");
+       await this.webServer.start(3000);
      } catch (error) {
-       console.error(
-         `[APP] Failed to start: ${error instanceof Error ? error.message : String(error)}`
-       );
-       await this.cleanup();
-       process.exit(1);
+       console.warn(`[APP] Failed to start web UI: ${error instanceof Error ? error.message : String(error)}`);
+       // Don't fail startup if web UI fails - it's optional
      }
+
+     // Connect to OBS
+     await this.obsClient.connect();
+
+     // Start character polling loop
+     console.log(
+       `[APP] Starting character polling loop (interval: ${this.pollIntervalMs}ms)...`
+     );
+     await this.poll();
+
+     // Schedule subsequent character polls
+     this.pollHandle = setInterval(() => {
+       this.poll().catch((error) => {
+         console.error(`[APP] Poll error: ${error instanceof Error ? error.message : String(error)}`);
+         this.shutdown("POLL_ERROR");
+       });
+     }, this.pollIntervalMs);
+
+     // Start game log polling if configured
+     if (this.gameLogClient && this.config.gameLog) {
+       console.log(
+         `[APP] Starting game log polling (interval: ${this.config.gameLog.pollIntervalMs}ms)...`
+       );
+       await this.pollGameLog();
+
+       this.gameLogPollHandle = setInterval(() => {
+         this.pollGameLog().catch((error) => {
+           console.error(`[APP] Game log poll error: ${error instanceof Error ? error.message : String(error)}`);
+           // Don't shutdown on game log errors - they're less critical
+         });
+       }, this.config.gameLog.pollIntervalMs);
+     }
+
+     console.log("[APP] ✓ Automation started successfully");
    }
 
       /**
@@ -434,21 +426,27 @@ class OBSDndBeyondAutomation {
     }
   }
 
-  /**
-   * Gracefully shutdown the application
-   */
-  private async shutdown(signal: string): Promise<void> {
-    if (this.isShuttingDown) {
-      return;
-    }
+   /**
+    * Gracefully shutdown the application
+    */
+   private async shutdown(signal: string): Promise<void> {
+     if (this.isShuttingDown) {
+       return;
+     }
 
-    this.isShuttingDown = true;
-    console.log(`\n[APP] Received ${signal}, shutting down gracefully...`);
+     this.isShuttingDown = true;
+     console.log(`\n[APP] Received ${signal}, shutting down gracefully...`);
 
-    await this.cleanup();
-    console.log("[APP] Shutdown complete");
-    process.exit(0);
-  }
+     await this.cleanup();
+     console.log("[APP] Shutdown complete");
+
+     // For error-triggered shutdowns, wait for keypress so the user can read the error
+     if (signal !== "SIGINT" && signal !== "SIGTERM") {
+       await waitForKeypress();
+     }
+
+     process.exit(signal === "SIGINT" || signal === "SIGTERM" ? 0 : 1);
+   }
 
    /**
     * Clean up resources
@@ -510,7 +508,36 @@ async function waitForKeypress(): Promise<void> {
 async function main(): Promise<void> {
   try {
     console.log("[APP] Loading configuration...");
-    const config = await loadOrCreateConfig();
+    const { config, needsSetup } = await loadOrCreateConfig();
+
+    if (needsSetup) {
+      // Setup mode: only start the web server for configuration
+      console.log("\n╔════════════════════════════════════════════════════════════╗");
+      console.log("║                                                            ║");
+      console.log("║   FIRST-TIME SETUP                                         ║");
+      console.log("║                                                            ║");
+      console.log("║   A default config.json has been created.                  ║");
+      console.log("║   Open the web UI to configure your settings:              ║");
+      console.log("║                                                            ║");
+      console.log("║     → http://localhost:3000                                ║");
+      console.log("║                                                            ║");
+      console.log("║   After saving your settings, restart the application.     ║");
+      console.log("║                                                            ║");
+      console.log("╚════════════════════════════════════════════════════════════╝\n");
+
+      const webServer = new WebServer(config);
+      try {
+        await webServer.start(3000);
+        console.log("[APP] Web UI is running. Configure your settings at http://localhost:3000");
+        console.log("[APP] Press Ctrl+C to exit.\n");
+      } catch (error) {
+        console.error(`[APP] Failed to start web UI: ${error instanceof Error ? error.message : String(error)}`);
+        await waitForKeypress();
+        process.exit(1);
+      }
+      return; // Keep process alive via the web server
+    }
+
     const app = new OBSDndBeyondAutomation(config);
     await app.start();
   } catch (error) {
@@ -526,16 +553,24 @@ async function main(): Promise<void> {
   }
 }
 
-// Run the application
-main().catch((error) => {
-  const errorMessage =
-    error instanceof Error ? error.message : String(error);
-  const errorStack =
-    error instanceof Error && error.stack ? `\n${error.stack}` : "";
+// Global exception handlers to prevent silent crashes in exe mode
+process.on("uncaughtException", async (error) => {
   console.error(
-    `\n❌ [FATAL ERROR] Uncaught exception: ${errorMessage}${errorStack}`
+    `\n❌ [FATAL ERROR] Uncaught exception: ${error.message}\n${error.stack || ""}`
   );
-  waitForKeypress().then(() => {
-    process.exit(1);
-  });
+  await waitForKeypress();
+  process.exit(1);
 });
+
+process.on("unhandledRejection", async (reason) => {
+  const errorMessage = reason instanceof Error ? reason.message : String(reason);
+  const errorStack = reason instanceof Error && reason.stack ? `\n${reason.stack}` : "";
+  console.error(
+    `\n❌ [FATAL ERROR] Unhandled rejection: ${errorMessage}${errorStack}`
+  );
+  await waitForKeypress();
+  process.exit(1);
+});
+
+// Run the application
+main();

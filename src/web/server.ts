@@ -126,12 +126,13 @@ export class WebServer {
     // Check if running as packaged executable
     // @ts-expect-error - process.pkg is added by pkg at runtime
     if (process.pkg) {
-      // In packaged mode, assets are in the snapshot filesystem
-      // pkg places assets relative to the bundle location
-      return path.join(__dirname, '../web-ui');
+      // In packaged mode, assets are in the pkg snapshot filesystem.
+      // esbuild bundles to dist/bundle.cjs, so __dirname = C:\snapshot\dist\
+      // web-ui assets are included from dist/web-ui/, so they end up at C:\snapshot\dist\web-ui\
+      return path.join(__dirname, 'web-ui');
     }
     
-    // Development mode - relative to source file location
+    // Development mode - relative to source file location (src/web/ -> ../../web-ui)
     return path.join(__dirname, '../../web-ui');
   }
 
