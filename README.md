@@ -1,42 +1,41 @@
 # OBS D&D Beyond Automation
 
-Automatically synchronize D&D Beyond character data with OBS for live streaming overlays. Display HP states, real-time character stats, AND live dice rolls directly in your stream.
+Automatically synchronize D&D Beyond character data with OBS for live streaming overlays. Display HP states, real-time character stats, and live dice rolls directly in your stream.
+
+Built in Rust for fast startup, low memory usage, and a single portable executable.
 
 ## Quick Start
 
-### 1. Install Dependencies
+### 1. Install Rust
+
+Install from [rustup.rs](https://rustup.rs/) or run:
 ```bash
-npm install
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
-### 2. Configure Using Interactive Setup (Recommended)
-
-On first run, the application will automatically launch an interactive configuration wizard:
+### 2. Build
 
 ```bash
-npm run dev
+cargo build --release
 ```
 
-The wizard will guide you through:
-- D&D Beyond credentials (Character ID and Cobalt Session)
-- OBS WebSocket connection (URL and optional password)
-- HP display mode (image_swap or visibility_toggle)
-- Mode-specific settings (source/scene names, image paths)
-- Optional polling interval, stat mappings, and game log settings
+The binary will be at `target/release/obs-dndbeyond-automation.exe` (Windows).
 
-Your configuration will be saved to `config.json` for future runs.
+### 3. First Run
 
-**To re-run the setup wizard at any time:**
+On first run with no `config.json`, a default template is created and the web UI starts:
+
 ```bash
-npm run dev -- --setup
+cargo run --release
 ```
 
-### 3. Manual Configuration (Alternative)
+Open http://localhost:3000 to configure your settings, then restart the application.
 
-If you prefer to manually create `config.json`, copy the example:
+### 4. Manual Configuration (Alternative)
+
+Copy the example and edit:
 ```bash
 cp config.example.json config.json
-# Edit config.json with your settings
 ```
 
 **Finding your Credentials:**
@@ -52,11 +51,9 @@ cp config.example.json config.json
 4. Find a request to `character-service.dndbeyond.com`
 5. In Request Headers, copy the `cobalt-session` cookie value
 
+### 5. HP State Display Mode
 
-
-### 4. HP State Display Mode
-
-If using manual config.json, choose your HP display mode:
+Choose your HP display mode in `config.json`:
 
 **Option A: Image Swap Mode** (swap portrait images based on HP)
 ```json
@@ -86,7 +83,7 @@ If using manual config.json, choose your HP display mode:
 ```
 Then create scene items in OBS with these exact names: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 
-### 5. (Optional) Configure Stat Display
+### 6. (Optional) Configure Stat Display
 
 Map any character stat to an OBS text source:
 ```json
@@ -101,7 +98,7 @@ Map any character stat to an OBS text source:
 }
 ```
 
-### 6. (Optional) Configure Dice Roll Display
+### 7. (Optional) Configure Dice Roll Display
 
 Display your dice rolls from D&D Beyond's game log:
 ```json
@@ -128,390 +125,137 @@ Display your dice rolls from D&D Beyond's game log:
 - **Game ID**: Open your campaign, check Network tab for requests to `game-log-rest-live.dndbeyond.com`, find `gameId` parameter
 - **User ID**: Same request will show your `userId` parameter
 
-### 7. Start the Application
+### 8. Run
+
 ```bash
-npm start
+cargo run --release
 ```
 
-For development with auto-reload:
-```bash
-npm run dev
-```
+## Features
 
-### 🩸 HP State Tracking (Original Feature)
-- ✅ **Real-time HP Sync**: Polls D&D Beyond every 5-10 seconds (configurable)
-- ✅ **Flexible Display**: Choose between image swapping or visibility toggling
-- ✅ **Smart State Detection**: 
-  - Healthy (> 75%)
-  - Scratched (50-75%)
-  - Bloodied (25-50%)
-  - Dying (0-25%)
-  - Unconscious (0 HP or death saves)
-- ✅ **Automatic Reconnection**: Gracefully handles connection drops
+### HP State Tracking
+- **Real-time HP Sync**: Polls D&D Beyond every 5-10 seconds (configurable)
+- **Flexible Display**: Choose between image swapping or visibility toggling
+- **Smart State Detection**: Healthy (>75%), Scratched (50-75%), Bloodied (25-50%), Dying (0-25%), Unconscious (0 HP or death saves)
+- **Automatic Reconnection**: Gracefully handles connection drops
 
-### 📊 Live Stat Display (New!)
-- ✅ **25+ Character Stats**: Map any D&D stat to your OBS overlay
-- ✅ **Real-time Updates**: Stats update whenever they change
-- ✅ **Formatted Output**: Modifiers display with +/- signs, speeds with "ft." suffix
-- ✅ **Flexible Formatting**: Use `{value}` placeholders in custom formats
-- ✅ **Combat Ready**: Initiative, AC, spell DCs, passive checks all available
+### Live Stat Display
+- **25+ Character Stats**: Map any D&D stat to your OBS overlay
+- **Real-time Updates**: Stats update whenever they change
+- **Formatted Output**: Modifiers display with +/- signs, speeds with "ft." suffix
+- **Combat Ready**: Initiative, AC, spell DCs, passive checks all available
 
-### 🎲 Live Dice Rolls (New!)
-- ✅ **Real-time Roll Display**: See your D&D Beyond dice rolls in OBS
-- ✅ **Last Roll + History**: Separate displays for most recent roll and roll history
-- ✅ **Flexible Formatting**: Customize how rolls appear with placeholders
-- ✅ **Your Rolls Only**: Filters to show only your character's rolls
-- ✅ **All Roll Types**: Attacks, saves, checks, damage, healing - all supported
+### Live Dice Rolls
+- **Real-time Roll Display**: See your D&D Beyond dice rolls in OBS
+- **Last Roll + History**: Separate displays for most recent roll and roll history
+- **Flexible Formatting**: Customize how rolls appear with placeholders
+- **Your Rolls Only**: Filters to show only your character's rolls
 
-### 🛡️ General Reliability
-- ✅ **Type-Safe**: Full TypeScript coverage
-- ✅ **Efficient**: Only updates OBS when values actually change
-- ✅ **Graceful Errors**: Detailed logging helps troubleshoot issues
+### Rules Engine
+- **Condition-Action System**: Trigger OBS changes based on character state
+- **20+ Condition Types**: HP, death saves, equipment, ability scores, level, and more
+- **5 Action Types**: Set image, visibility, text, filter visibility, input settings
+- **Visual Editor**: Web UI at http://localhost:3000 for managing rules
 
-## Configuration
+### Web Configuration UI
+- **Live Preview**: Real-time character state display
+- **Rules Editor**: Visual drag-and-drop rule management
+- **Settings Panel**: Configure all settings without editing JSON
 
-The application uses `config.json` for all configuration. See the Quick Start section above for setup instructions.
-
-### Available Stats
+## Available Stats
 
 #### Basic
-- **`level`** - Total character level (sum of all classes)
+- **`level`** - Total character level
 - **`ac`** - Armor Class
 
 #### Hit Points
-- **`hp_current`** - Current HP (number)
-- **`hp_max`** - Maximum HP (number)
-- **`hp_temp`** - Temporary HP (number)
-- **`hp_display`** - Formatted as "72/125" (string)
+- **`hp_current`** - Current HP
+- **`hp_max`** - Maximum HP
+- **`hp_temp`** - Temporary HP
+- **`hp_display`** - Formatted as "72/125"
 
-#### Ability Scores
-- **`strength`** - Strength score (8-20)
-- **`dexterity`** - Dexterity score
-- **`constitution`** - Constitution score
-- **`intelligence`** - Intelligence score
-- **`wisdom`** - Wisdom score
-- **`charisma`** - Charisma score
-
-#### Ability Modifiers
-- **`strength_mod`** - Strength modifier ("+3" or "-1")
-- **`dexterity_mod`** - Dexterity modifier
-- **`constitution_mod`** - Constitution modifier
-- **`intelligence_mod`** - Intelligence modifier
-- **`wisdom_mod`** - Wisdom modifier
-- **`charisma_mod`** - Charisma modifier
+#### Ability Scores & Modifiers
+- **`strength`**, **`strength_mod`** - Strength score and modifier
+- **`dexterity`**, **`dexterity_mod`** - Dexterity score and modifier
+- **`constitution`**, **`constitution_mod`** - Constitution score and modifier
+- **`intelligence`**, **`intelligence_mod`** - Intelligence score and modifier
+- **`wisdom`**, **`wisdom_mod`** - Wisdom score and modifier
+- **`charisma`**, **`charisma_mod`** - Charisma score and modifier
 
 #### Combat Stats
-- **`proficiency`** - Proficiency bonus ("+2" to "+6")
-- **`initiative`** - Initiative bonus ("+5" or "-2")
-- **`speed`** - Movement speed ("30 ft.")
+- **`proficiency`** - Proficiency bonus
+- **`initiative`** - Initiative bonus
+- **`speed`** - Movement speed
 
 #### Passive Checks
-- **`passive_perception`** - Passive Perception (10 + WIS mod + prof if applicable)
-- **`passive_investigation`** - Passive Investigation
-- **`passive_insight`** - Passive Insight
+- **`passive_perception`**, **`passive_investigation`**, **`passive_insight`**
 
 #### Spellcasting
-- **`spell_save_dc`** - Spell Save DC (8 + proficiency + spellcasting ability mod)
-- **`spell_attack`** - Spell attack modifier ("+5" or "-1")
+- **`spell_save_dc`** - Spell Save DC
+- **`spell_attack`** - Spell attack modifier
 
-## Dice Roll Configuration
-
-### Overview
-
-Display your D&D Beyond dice rolls in real-time on your OBS overlay. Requires your character to be in a campaign.
-
-### Setup
-
-Configure the `gameLog` section in `config.json` (see example above in Quick Start section 6).
-
-### Available Placeholders
+## Dice Roll Placeholders
 
 | Placeholder | Example | Description |
 |-------------|---------|-------------|
 | `{character}` | `Kan` | Character name |
-| `{action}` | `Persuasion` | What was rolled (skill, attack, spell, etc.) |
+| `{action}` | `Persuasion` | What was rolled |
 | `{total}` | `21` | Final roll result |
-| `{breakdown}` | `(14,20)+1` | Dice breakdown showing individual rolls |
+| `{breakdown}` | `(14,20)+1` | Dice breakdown |
 | `{roll_type}` | `check` | Type: check, save, to hit, heal, roll |
 | `{roll_kind}` | `advantage` | Advantage, disadvantage, or blank |
 | `{dice}` | `2d20+5` | Dice notation |
 | `{values}` | `14, 20` | Individual die values |
 
-### Format Examples
-
-**Simple (just the result):**
-```json
-"lastRoll": {
-  "sourceName": "Text_LastRoll",
-  "format": "{action}: {total}"
-}
-// Output: "Persuasion: 21"
-```
-
-**With advantage indicator:**
-```json
-"lastRoll": {
-  "sourceName": "Text_LastRoll",
-  "format": "{action}: {total} {roll_kind}"
-}
-// Output: "Persuasion: 21 advantage"
-```
-
-**Detailed breakdown:**
-```json
-"lastRoll": {
-  "sourceName": "Text_LastRoll",
-  "format": "{action} ({roll_type}): {breakdown} = {total}"
-}
-// Output: "Persuasion (check): (14,20)+1 = 21"
-```
-
-**Compact history:**
-```json
-"rollHistory": {
-  "sourceName": "Text_RollHistory",
-  "format": "{action} {total}",
-  "count": 5
-}
-// Output: "Perception 17"
-```
-
-**History with character name (for multi-character setups):**
-```json
-"rollHistory": {
-  "sourceName": "Text_RollHistory",
-  "format": "{character}: {action} {total}",
-  "count": 5
-}
-// Output: "Kan: Perception 17"
-```
-
-**With advantage indicator:**
-```env
-LAST_ROLL_FORMAT={action}: {total} {roll_kind}
-# Output: "Persuasion: 21 advantage"
-```
-
-**Detailed breakdown:**
-```env
-LAST_ROLL_FORMAT={action} ({roll_type}): {breakdown} = {total}
-# Output: "Persuasion (check): (14,20)+1 = 21"
-```
-
-**Compact history:**
-```env
-ROLL_HISTORY_FORMAT={action} {total}
-# Output: "Perception 17"
-```
-
-**History with character name (for multi-character setups):**
-```env
-ROLL_HISTORY_FORMAT={character}: {action} {total}
-# Output: "Kan: Perception 17"
-```
-
-### Finding Your Game ID and User ID
-
-1. Open your D&D Beyond campaign page
-2. Open browser DevTools (F12) → Network tab
-3. Make a dice roll on your character sheet
-4. Look for a request to `game-log-rest-live.dndbeyond.com`
-5. Check the URL parameters:
-   - `gameId=XXXXXXX` → Your Game ID
-   - `userId=XXXXXXXX` → Your User ID
-
-## Scripts
-
-```bash
-npm start          # Run the application
-npm run dev        # Run with auto-reload (development)
-npm run build      # Compile TypeScript to JavaScript
-npm run clean      # Remove compiled files
-```
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────────┐
-│                    OBS D&D Beyond Automation                  │
-├──────────────────────────────────────────────────────────────┤
-│                                                              │
-│   Character Poll Loop          Game Log Poll Loop            │
-│   (every 5-15 seconds)         (every 3 seconds)             │
-│          │                            │                      │
-│          ▼                            ▼                      │
-│   ┌─────────────┐             ┌─────────────────┐            │
-│   │ D&D Beyond  │             │ D&D Beyond      │            │
-│   │ Character   │             │ Game Log API    │            │
-│   │ API         │             │ (Bearer Token)  │            │
-│   └──────┬──────┘             └────────┬────────┘            │
-│          │                             │                     │
-│          ▼                             ▼                     │
-│   ┌─────────────┐             ┌─────────────────┐            │
-│   │ HP State &  │             │ Parse & Filter  │            │
-│   │ Stats Calc  │             │ Dice Rolls      │            │
-│   └──────┬──────┘             └────────┬────────┘            │
-│          │                             │                     │
-│          └──────────────┬──────────────┘                     │
-│                         ▼                                    │
-│              ┌─────────────────────┐                         │
-│              │  Update OBS         │                         │
-│              │  (only on changes)  │                         │
-│              └─────────────────────┘                         │
-│                         │                                    │
-│         ┌───────────────┼───────────────┐                    │
-│         ▼               ▼               ▼                    │
-│   ┌──────────┐   ┌──────────┐   ┌──────────────┐             │
-│   │ HP Image │   │ Stat     │   │ Dice Roll    │             │
-│   │ /Toggle  │   │ Text     │   │ Text Sources │             │
-│   └──────────┘   └──────────┘   └──────────────┘             │
-│                                                              │
-└──────────────────────────────────────────────────────────────┘
-```
-
-## HP State Thresholds
-
-| State | HP Range | Typical Visual |
-|-------|----------|---|
-| Healthy | > 75% | Green, full portrait |
-| Scratched | 50-75% | Yellow, minor wounds |
-| Bloodied | 25-50% | Orange, significant damage |
-| Dying | 0-25% | Red, critical condition |
-| Unconscious | 0 or death saves | Gray/black, unconscious |
-
 ## Project Structure
 
 ```
 obs-dndbeyond-automation/
-├── PLAN.md                         # Detailed implementation plan
-├── README.md                        # This file
-├── package.json                    # Dependencies
-├── tsconfig.json                   # TypeScript config
+├── Cargo.toml                      # Rust dependencies
 ├── config.example.json             # Configuration template
-├── .gitignore                      # Git exclusions
-├── src/
-│   ├── index.ts                   # Main entry point
-│   ├── config.ts                  # Configuration loading
-│   ├── types.ts                   # TypeScript types
-│   ├── dnd-beyond/
-│   │   ├── client.ts              # D&D Beyond API client
-│   │   └── hp-calculator.ts       # HP state calculation
-│   ├── stats/
-│   │   ├── index.ts               # Stat calculation orchestrator
-│   │   ├── calculator.ts          # Stat value computation
-│   │   ├── definitions.ts         # All stat definitions
-│   │   └── types.ts               # Stat types
-│   ├── game-log/
-│   │   ├── index.ts               # Game log exports
-│   │   ├── client.ts              # Game log API client
-│   │   ├── formatter.ts           # Roll formatting
-│   │   └── types.ts               # Game log types
-│   └── obs/
-│       └── client.ts              # OBS WebSocket client
-└── dist/                           # Compiled output (generated)
+├── config.rules.example.json       # Rules engine example
+├── web-ui/                         # Web configuration UI
+│   ├── index.html
+│   ├── app.js
+│   └── styles.css
+└── rust-src/                       # Rust source code
+    ├── main.rs                     # Entry point & polling loops
+    ├── types.rs                    # Core type definitions
+    ├── config/                     # Configuration loading & validation
+    ├── dnd_beyond/                 # D&D Beyond API client & HP calculator
+    ├── obs/                        # OBS WebSocket client (v5 protocol)
+    ├── stats/                      # 25+ stat definitions & calculator
+    ├── game_log/                   # Dice roll fetching & formatting
+    ├── rules/                      # Rules engine & action executor
+    └── web/                        # Web server (axum) with SSE
 ```
 
 ## Troubleshooting
 
 ### "Cannot read character data"
-- Verify `dndBeyond.characterId` is correct in `config.json` (from D&D Beyond URL)
+- Verify `dndBeyond.characterId` in `config.json`
 - Get a fresh `dndBeyond.cobaltSession` cookie from browser DevTools
 - Check internet connection
-- Try the manual test below
 
 ### "Failed to connect to OBS WebSocket"
 - Ensure OBS is running
-- Enable WebSocket Server: Tools → WebSocket Server Settings → Enable
-- Verify `obs.websocketUrl` in `config.json` matches OBS settings (usually `ws://localhost:4455`)
-- Check firewall isn't blocking the connection
+- Enable WebSocket Server: Tools > WebSocket Server Settings > Enable
+- Verify `obs.websocketUrl` in `config.json` (usually `ws://localhost:4455`)
 
 ### "Scene item not found" (visibility_toggle mode)
-- Verify scene items are named exactly: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
+- Scene items must be named exactly: `healthy`, `scratched`, `bloodied`, `dying`, `unconscious`
 - Names are case-sensitive
-- Ensure items exist in the scene specified by `obs.sceneName` in `config.json`
 
-### "Source not found" (image_swap mode)
-- Verify source name in `obs.sourceName` matches exactly (case-sensitive)
-- Ensure the source exists in your OBS scene
-
-### No OBS updates even though app runs
+### No OBS updates
 - Take or heal damage on character sheet (app only updates on change)
-- Check OBS source/scene names in `config.json` match your OBS setup exactly
-- Verify file paths in `obs.images` are correct and use forward slashes (e.g., `C:/path/file.png`)
-
-### Stat values not updating
-- Verify `statMappings` format is correct in `config.json`
-- Check that OBS text sources exist and have exact names from config
-- Ensure stat IDs match the available stats list above
-- If using custom format, include `{value}` placeholder
+- Verify OBS source/scene names match exactly
 
 ### Dice rolls not appearing
-- Verify `gameLog.enabled` is `true` in `config.json`
-- Check `gameLog.gameId` and `gameLog.userId` are correct
-- Ensure your character is in a campaign (game log requires campaign membership)
-- Make a roll on D&D Beyond and check console for `[GAME_LOG]` messages
-- Verify OBS text sources exist with exact names from config
-
-### "Failed to fetch bearer token" error
-- Get a fresh `dndBeyond.cobaltSession` cookie from browser DevTools
-- The cobalt session may have expired
-
-## Development
-
-### Type Safety
-- Full TypeScript strict mode enabled
-- No `any` types used
-- Type definitions for all public APIs
-
-### Error Handling
-- Try/catch throughout
-- Graceful degradation on API failures
-- Automatic reconnection on WebSocket drops
-- Detailed error logging with context
-
-### Logging
-- Timestamped console output
-- Colored status indicators (✓ for success, ✗ for failure, ⚠ for warnings)
-- Poll number tracking for debugging
-- Detailed stat change logging
-
-## Dependencies
-
-- **obs-websocket-js**: OBS WebSocket protocol v5 (OBS 28+)
-- **dotenv**: Environment variable loading
-- **@types/node**: Node.js type definitions
-- **typescript**: TypeScript compiler
-
-## Security Notes
-
-- Never commit `config.json` file to version control (`.gitignore` includes it)
-- `dndBeyond.cobaltSession` is sensitive - treat like a password
-- Use local OBS WebSocket when possible (avoid exposing to network)
-- If exposing to network, use strong password in OBS settings
-
-## Advanced Troubleshooting
-
-### Testing D&D Beyond API manually
-```bash
-curl -H "Cookie: cobalt-session=YOUR_COOKIE" \
-  https://character-service.dndbeyond.com/character/v5/character/YOUR_ID
-```
-
-### Testing OBS WebSocket connection
-```bash
-# In OBS: Tools → WebSocket Server Settings → Copy Connection Info
-# Verify the URL and password are correct in your config.json
-```
-
-### Enable verbose logging
-Modify `src/index.ts` to add more console.log statements and rebuild:
-```bash
-npm run build
-node dist/index.js
-```
+- Verify `gameLog.enabled` is `true` and IDs are correct
+- Character must be in a campaign
+- Check console for `[GAME_LOG]` messages
 
 ### Save API response for debugging
-In `config.json`, set:
 ```json
 {
   "debug": {
@@ -519,43 +263,9 @@ In `config.json`, set:
   }
 }
 ```
-This will save the raw D&D Beyond API response to `api-response.json` on each poll (useful for debugging stat calculations). Note: This creates large files (~40KB per poll).
 
-## Common Questions
+## Security Notes
 
-**Q: Can I use both HP states and stat display?**  
-A: Yes! Both work simultaneously. Configure `OBS_MODE` for HP and `STAT_MAPPING_*` for stats.
-
-**Q: How often does it update?**  
-A: Every 5-10 seconds by default (configurable via `POLL_INTERVAL_MS`). Only pushes changes to OBS when values actually change.
-
-**Q: Can I display multiple stat values in one source?**  
-A: Not directly. Each `STAT_MAPPING_X` is one stat → one source. Create multiple mappings if you want multiple stats on screen.
-
-**Q: Which stats affect which calculations?**  
-A: The calculator uses equipped/attuned items and all active modifiers (race, class, background, feats, conditions).
-
-**Q: Does it work with temporary HP, abilities, buffs, etc.?**  
-A: Yes! It reads the full character data including temp HP, all ability modifiers, item bonuses, feat bonuses, and active conditions.
-
-**Q: Can I show dice rolls from my whole party?**  
-A: Currently only your own rolls are displayed (filtered by `GAME_LOG_USER_ID`). This keeps your overlay focused on your character.
-
-**Q: Why don't I see my dice rolls?**  
-A: Dice roll display requires your character to be in a campaign. The game log API only works for campaign play, not standalone character sheets.
-
-**Q: Can I customize which rolls appear?**  
-A: All roll types (checks, saves, attacks, damage, healing) are shown. Filtering by roll type is not yet supported but could be added.
-
-## Support
-
-For issues or questions:
-1. Check the Troubleshooting section above
-2. Verify configuration in `config.json` matches your setup
-3. Check OBS logs: Help → View Logs
-4. Review application output for specific error messages
-5. See `PLAN.md` for detailed architecture
-
----
-
-**Made for D&D streamers and storytellers** 🐉
+- Never commit `config.json` (`.gitignore` excludes it)
+- `dndBeyond.cobaltSession` is sensitive - treat like a password
+- Use local OBS WebSocket when possible
