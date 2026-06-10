@@ -50,6 +50,16 @@ export interface JsonConfigStatMapping {
 }
 
 /**
+ * Computed stat configuration: an arithmetic expression mapped to an OBS source
+ */
+export interface JsonConfigComputedStat {
+  id: string;
+  expression: string;
+  obsSourceName: string;
+  format?: string;
+}
+
+/**
  * Last roll configuration
  */
 export interface JsonConfigLastRoll {
@@ -114,6 +124,7 @@ export interface JsonConfig {
   obs: JsonConfigObs;
   polling: JsonConfigPolling;
   statMappings?: JsonConfigStatMapping[];
+  computedStats?: JsonConfigComputedStat[];
   gameLog?: JsonConfigGameLog;
   debug?: JsonConfigDebug;
   rules?: JsonConfigRules;

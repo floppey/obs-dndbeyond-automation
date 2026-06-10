@@ -4,8 +4,9 @@
  */
 
 import { DndBeyondCharacterResponse } from "../types.js";
-import { CalculatedStat, StatId, StatMapping } from "./types.js";
-import { statDefinitions } from "./definitions.js";
+import { CalculatedStat, ComputedStat, StatId, StatMapping } from "./types.js";
+import { statDefinitions, getExpressionVariables } from "./definitions.js";
+import { evaluateExpression } from "./expression.js";
 
 /**
  * Calculator for D&D Beyond stats
@@ -69,6 +70,51 @@ export class StatCalculator {
           obsSourceName: mapping.obsSourceName,
           value: "ERROR",
           previousValue: previousValues?.get(mapping.obsSourceName),
+          changed: true,
+        };
+      }
+    });
+  }
+
+  /**
+   * Calculate all configured computed stats (arithmetic expressions).
+   * Returns the same CalculatedStat shape as calculateMappings, so results
+   * can be merged and pushed to OBS identically.
+   */
+  calculateComputed(
+    computed: ComputedStat[],
+    data: DndBeyondCharacterResponse,
+    previousValues?: Map<string, string>
+  ): CalculatedStat[] {
+    const variables = getExpressionVariables(data);
+
+    return computed.map((stat) => {
+      try {
+        const rawValue = evaluateExpression(stat.expression, variables);
+        let formattedValue = String(rawValue);
+
+        if (stat.format) {
+          formattedValue = stat.format.replace("{value}", String(rawValue));
+        }
+
+        const previousValue = previousValues?.get(stat.obsSourceName);
+        const changed = formattedValue !== previousValue;
+
+        return {
+          obsSourceName: stat.obsSourceName,
+          value: formattedValue,
+          previousValue,
+          changed,
+        };
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[STATS] Failed to evaluate computed stat "${stat.id}" (${stat.expression}) for ${stat.obsSourceName}: ${errorMessage}`
+        );
+        return {
+          obsSourceName: stat.obsSourceName,
+          value: "ERROR",
+          previousValue: previousValues?.get(stat.obsSourceName),
           changed: true,
         };
       }

@@ -45,6 +45,20 @@ export interface StatMapping {
 }
 
 /**
+ * Configuration for a computed stat: an arithmetic expression over character
+ * variables, mapped to an OBS text source. Used for custom calculations that
+ * aren't covered by a single built-in stat (e.g. a CON-based spell save DC).
+ */
+export interface ComputedStat {
+  /** Identifier for logging/debugging (not used in expressions) */
+  id: string;
+  /** Arithmetic expression, e.g. "8 + proficiency + constitution_mod" */
+  expression: string;
+  obsSourceName: string;
+  format?: string; // Optional format string, e.g. "DC {value}"
+}
+
+/**
  * Stat definition with calculation function
  */
 export interface StatDefinition {

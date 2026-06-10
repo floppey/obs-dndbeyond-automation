@@ -4,7 +4,7 @@
  */
 
 import { Config, HpState } from "../types.js";
-import { StatMapping } from "../stats/types.js";
+import { StatMapping, ComputedStat } from "../stats/types.js";
 import { GameLogConfig } from "../game-log/types.js";
 import { RuleEngineConfig } from "../rules/types.js";
 import { loadJsonConfig, saveJsonConfig, configExists } from "./loader.js";
@@ -138,6 +138,19 @@ function convertJsonConfigToConfig(jsonConfig: JsonConfig): Config {
     }
   }
 
+  // Parse computed stats (arithmetic expressions over character variables)
+  const computedStats: ComputedStat[] = [];
+  if (jsonConfig.computedStats) {
+    for (const computed of jsonConfig.computedStats) {
+      computedStats.push({
+        id: computed.id,
+        expression: computed.expression,
+        obsSourceName: computed.obsSourceName,
+        format: computed.format,
+      });
+    }
+  }
+
   // Parse game log configuration
   let gameLogConfig: GameLogConfig | undefined;
   if (jsonConfig.gameLog && jsonConfig.gameLog.enabled) {
@@ -175,6 +188,7 @@ function convertJsonConfigToConfig(jsonConfig: JsonConfig): Config {
     obs: obsClientConfig,
     pollIntervalMs: jsonConfig.polling.intervalMs,
     statMappings,
+    computedStats,
     gameLog: gameLogConfig,
     rules: jsonConfig.rules as RuleEngineConfig | undefined,
     debug: {

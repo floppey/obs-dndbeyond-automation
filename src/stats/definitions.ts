@@ -328,6 +328,66 @@ function getAbilityIndex(abilityName: string): number {
 }
 
 /**
+ * Build the set of numeric variables available to computed-stat expressions.
+ *
+ * These are the raw numeric values (not the display-formatted strings the stat
+ * definitions return), so expressions can do arithmetic on them directly.
+ * Modifiers are signed integers (e.g. -1, 0, 3); proficiency is the bonus number
+ * (e.g. 3, not "+3").
+ *
+ * @param data Character data
+ * @returns Map of variable name → numeric value
+ */
+function getExpressionVariables(
+  data: DndBeyondCharacterResponse
+): Record<string, number> {
+  const level = getTotalLevel(data.classes);
+
+  const scores = {
+    strength: getAbilityScore(data, 0),
+    dexterity: getAbilityScore(data, 1),
+    constitution: getAbilityScore(data, 2),
+    intelligence: getAbilityScore(data, 3),
+    wisdom: getAbilityScore(data, 4),
+    charisma: getAbilityScore(data, 5),
+  };
+
+  const vars: Record<string, number> = {
+    level,
+    proficiency: getProficiencyBonus(level),
+    // Ability scores
+    ...scores,
+    // Ability modifiers (signed integers)
+    strength_mod: getAbilityModifier(scores.strength),
+    dexterity_mod: getAbilityModifier(scores.dexterity),
+    constitution_mod: getAbilityModifier(scores.constitution),
+    intelligence_mod: getAbilityModifier(scores.intelligence),
+    wisdom_mod: getAbilityModifier(scores.wisdom),
+    charisma_mod: getAbilityModifier(scores.charisma),
+  };
+
+  // Reuse existing stat definitions for derived values that already return numbers,
+  // so computed-stat math stays in sync with the built-in stats.
+  for (const id of [
+    "ac",
+    "hp_current",
+    "hp_max",
+    "hp_temp",
+    "passive_perception",
+    "passive_investigation",
+    "passive_insight",
+    "spell_save_dc",
+  ] as StatId[]) {
+    const value = definitions[id].calculate(data);
+    if (typeof value === "number") {
+      vars[id] = value;
+    }
+  }
+
+  return vars;
+}
+
+/**
  * Stat definitions with calculation functions
  */
 const definitions: Record<StatId, StatDefinition> = {
@@ -744,5 +804,6 @@ export {
   getProficiencyBonus,
   isProficientInSkill,
   isModifierGrantedByChoice,
+  getExpressionVariables,
 };
 

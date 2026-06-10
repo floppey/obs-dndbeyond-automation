@@ -173,6 +173,7 @@ export function loadConfig(): Config {
       obs: obsConfig,
       pollIntervalMs,
       statMappings,
+      computedStats: [],
       gameLog: gameLogConfig,
       debug: {
         saveApiResponse: debugSaveApiResponse,

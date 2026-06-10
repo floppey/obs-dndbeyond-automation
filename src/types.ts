@@ -2,7 +2,7 @@
  * Type definitions for OBS D&D Beyond HP Swapper
  */
 
-import { StatMapping } from "./stats/types.js";
+import { StatMapping, ComputedStat } from "./stats/types.js";
 import { GameLogConfig } from "./game-log/types.js";
 import { RuleEngineConfig } from "./rules/types.js";
 
@@ -187,6 +187,7 @@ export interface Config {
   obs: OBSClientConfig;
   pollIntervalMs: number;
   statMappings: StatMapping[];
+  computedStats: ComputedStat[];
   gameLog?: GameLogConfig;
   rules?: RuleEngineConfig;
   debug: {

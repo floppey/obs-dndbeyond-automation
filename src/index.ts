@@ -215,6 +215,23 @@ class OBSDndBeyondAutomation {
             }
           }
 
+          // Calculate computed stats (arithmetic expressions) and merge them in,
+          // so they flow through the same change-detection and OBS update path.
+          if (this.config.computedStats.length > 0 && rawCharacterData) {
+            try {
+              const computed = this.statCalculator.calculateComputed(
+                this.config.computedStats,
+                rawCharacterData,
+                this.previousStatValues
+              );
+              statsCalculated = statsCalculated.concat(computed);
+            } catch (error) {
+              const errorMessage =
+                error instanceof Error ? error.message : String(error);
+              console.warn(`[POLL #${this.pollCount}] Failed to calculate computed stats: ${errorMessage}`);
+            }
+          }
+
           // Check if any stats changed
           const anyStatsChanged = statsCalculated.some((s) => s.changed);
 
