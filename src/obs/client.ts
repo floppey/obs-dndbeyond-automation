@@ -13,14 +13,42 @@ export class OBSClient {
   private config: OBSClientConfig;
   private obs: OBSWebSocket;
   private connected: boolean = false;
+  private shouldReconnect: boolean = true;
+  private retryLoopActive: boolean = false;
+  private retryDelayMs: number = 5000;
 
   constructor(config: OBSClientConfig) {
     this.config = config;
     this.obs = new OBSWebSocket();
+
+    this.obs.on("ConnectionClosed", () => {
+      // Failed connect attempts also emit this event - only react to a real drop
+      if (!this.connected) {
+        return;
+      }
+      console.warn("[OBS] ✗ Connection to OBS closed");
+      this.connected = false;
+      if (this.shouldReconnect) {
+        this.connectWithRetry().catch((error) => {
+          console.error(
+            `[OBS] Reconnect loop failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        });
+      }
+    });
+
+    this.obs.on("ConnectionError", (error) => {
+      if (this.connected) {
+        console.error(`[OBS] Connection error: ${error}`);
+      }
+      this.connected = false;
+    });
   }
 
   /**
-   * Connect to OBS WebSocket server
+   * Connect to OBS WebSocket server (single attempt)
    * @throws Error if connection fails
    */
   async connect(): Promise<void> {
@@ -29,25 +57,10 @@ export class OBSClient {
     }
 
     try {
-      console.log(
-        `[OBS] Connecting to OBS WebSocket at ${this.config.websocketUrl}...`
-      );
-
       await this.obs.connect(this.config.websocketUrl, this.config.websocketPassword);
 
       this.connected = true;
       console.log("[OBS] ✓ Connected to OBS WebSocket");
-
-      // Set up disconnection handler
-      this.obs.on("ConnectionClosed", () => {
-        console.warn("[OBS] ✗ Connection to OBS closed");
-        this.connected = false;
-      });
-
-      this.obs.on("ConnectionError", (error) => {
-        console.error(`[OBS] Connection error: ${error}`);
-        this.connected = false;
-      });
     } catch (error) {
       this.connected = false;
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -56,9 +69,49 @@ export class OBSClient {
   }
 
   /**
+   * Connect to OBS, retrying until it becomes available.
+   * Resolves once connected; never throws for connection failures.
+   */
+  async connectWithRetry(): Promise<void> {
+    if (this.retryLoopActive) {
+      return;
+    }
+    this.retryLoopActive = true;
+
+    try {
+      let attempt = 0;
+      while (this.shouldReconnect && !this.connected) {
+        attempt++;
+        try {
+          await this.connect();
+          return;
+        } catch (error) {
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          // Log the first failure and then a reminder every ~30s to avoid spam
+          if (attempt === 1) {
+            console.warn(
+              `[OBS] ${errorMessage} - waiting for OBS at ${this.config.websocketUrl}, retrying every ${this.retryDelayMs / 1000}s...`
+            );
+          } else if (attempt % 6 === 0) {
+            console.warn(
+              `[OBS] Still waiting for OBS (attempt ${attempt})...`
+            );
+          }
+          await new Promise((resolve) => setTimeout(resolve, this.retryDelayMs));
+        }
+      }
+    } finally {
+      this.retryLoopActive = false;
+    }
+  }
+
+  /**
    * Disconnect from OBS WebSocket server
    */
   async disconnect(): Promise<void> {
+    this.shouldReconnect = false;
+
     if (!this.connected) {
       return;
     }

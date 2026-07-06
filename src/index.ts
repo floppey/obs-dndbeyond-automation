@@ -89,20 +89,26 @@ class OBSDndBeyondAutomation {
        // Don't fail startup if web UI fails - it's optional
      }
 
-     // Connect to OBS
-     await this.obsClient.connect();
+     // Connect to OBS - waits until OBS is available, so the app can be
+     // started before or after OBS
+     await this.obsClient.connectWithRetry();
 
      // Start character polling loop
      console.log(
        `[APP] Starting character polling loop (interval: ${this.pollIntervalMs}ms)...`
      );
-     await this.poll();
+     await this.poll().catch((error) => {
+       console.error(
+         `[APP] Initial poll failed: ${error instanceof Error ? error.message : String(error)} - will retry on next poll`
+       );
+     });
 
      // Schedule subsequent character polls
      this.pollHandle = setInterval(() => {
        this.poll().catch((error) => {
-         console.error(`[APP] Poll error: ${error instanceof Error ? error.message : String(error)}`);
-         this.shutdown("POLL_ERROR");
+         console.error(
+           `[APP] Poll error: ${error instanceof Error ? error.message : String(error)} - will retry on next poll`
+         );
        });
      }, this.pollIntervalMs);
 
@@ -254,9 +260,11 @@ class OBSDndBeyondAutomation {
 
           // Update OBS for HP state if changed
           if (hpStateChanged) {
-            this.previousState = characterData.state;
             try {
               await this.updateOBS(characterData.state);
+              // Only mark the state as applied on success, so a failed
+              // update is retried on the next poll
+              this.previousState = characterData.state;
             } catch (error) {
               console.error(
                 `[APP] Failed to update OBS HP state: ${
@@ -391,12 +399,9 @@ class OBSDndBeyondAutomation {
    */
   private async updateOBS(state: HpState): Promise<void> {
     if (!this.obsClient.isConnected()) {
-      console.warn("[OBS] Not connected to OBS, attempting reconnect...");
-      try {
-        await this.obsClient.connect();
-      } catch (error) {
-        throw new Error("Failed to reconnect to OBS");
-      }
+      // Background reconnect (in OBSClient) will restore the connection;
+      // this update is skipped and the next state change will be applied
+      throw new Error("Not connected to OBS, reconnect in progress");
     }
 
     // Get configuration from environment to determine update mode
